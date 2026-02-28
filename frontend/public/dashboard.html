@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VINCERA - Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">VINCERA</div>
+        <div class="user-profile">
+            <img id="userAvatar" src="" alt="Profile">
+            <span id="userName">User</span>
+            <button id="logoutBtn" class="btn-secondary">Logout</button>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <div class="action-card">
+            <h2>New Meeting</h2>
+            <p>Start a new premium meeting instantly</p>
+            <button id="createMeetingBtn" class="btn-primary">Start Meeting</button>
+        </div>
+
+        <div class="action-card">
+            <h2>Join Meeting</h2>
+            <p>Enter a meeting code or link to join</p>
+            <input type="text" id="meetingCodeInput" placeholder="Enter meeting code...">
+            <button id="joinMeetingBtn" class="btn-secondary">Join</button>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script>
+        // Temporary Dashboard logic
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!checkAuth()) return;
+
+            document.getElementById('createMeetingBtn').addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/meeting/create', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.href = `/room/${data.meetingId}`;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+
+            document.getElementById('joinMeetingBtn').addEventListener('click', () => {
+                const code = document.getElementById('meetingCodeInput').value;
+                if (code) window.location.href = `/room/${code}`;
+            });
+        });
+    </script>
+</body>
+
+</html>

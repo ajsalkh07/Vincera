@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VINCERA - Meeting Room</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Include LiveKit JS Client SDK via CDN (for now, usually bundled) -->
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+</head>
+
+<body class="room-body">
+    <div class="main-room-container">
+        <div class="video-grid-container">
+            <div id="video-grid" class="video-grid">
+                <!-- Video elements will be injected here -->
+            </div>
+
+            <div class="controls-bar">
+                <button id="toggleMic" class="control-btn active">Mic</button>
+                <button id="toggleVideo" class="control-btn active">Cam</button>
+                <button id="toggleScreen" class="control-btn">Share</button>
+                <button id="leaveMeeting" class="control-btn danger">Leave</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" data-target="participants">Participants</button>
+                <button class="tab-btn" data-target="chat">Chat</button>
+                <button class="tab-btn" data-target="polls">Polls</button>
+            </div>
+
+            <div id="participants" class="tab-content active">
+                <ul id="participantsList"></ul>
+            </div>
+
+            <div id="chat" class="tab-content">
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="chatInput" placeholder="Message everyone...">
+                    <button id="sendChat">Send</button>
+                </div>
+            </div>
+
+            <div id="polls" class="tab-content">
+                <div id="activePolls"></div>
+                <button id="createPollBtn" class="btn-secondary full-width">Create Poll</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/room.js"></script>
+</body>
+
+</html>
