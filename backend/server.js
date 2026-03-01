@@ -34,7 +34,8 @@ io.on('connection', (socket) => {
             rooms[roomId] = {
                 hostId: user.userId,
                 participants: [],
-                polls: []
+                polls: [],
+                isScreenShareAllowed: false // Only host by default
             };
         }
 
@@ -42,11 +43,12 @@ io.on('connection', (socket) => {
             rooms[roomId].participants.push(user);
         }
 
-        // Emit room info including host and existing polls
-        io.to(roomId).emit('room-info', {
+        // Emit room info only to the joiner
+        socket.emit('room-info', {
             hostId: rooms[roomId].hostId,
             participants: rooms[roomId].participants,
-            polls: rooms[roomId].polls
+            polls: rooms[roomId].polls,
+            isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
         });
 
         socket.to(roomId).emit('user-connected', user);
@@ -63,10 +65,35 @@ io.on('connection', (socket) => {
             io.to(roomId).emit('receive-chat', { user, message });
         });
 
+        socket.on('raise-hand', (isRaised) => {
+            const p = rooms[roomId].participants.find(part => part.userId === user.userId);
+            if (p) {
+                p.isHandRaised = isRaised;
+                io.to(roomId).emit('hand-raised-updated', { userId: user.userId, isHandRaised: isRaised });
+            }
+        });
+
         socket.on('create-poll', (pollData) => {
+            if (rooms[roomId].hostId !== user.userId) return; // Host only
             const poll = { ...pollData, votedIds: [] };
             rooms[roomId].polls.push(poll);
-            io.to(roomId).emit('room-info', rooms[roomId]);
+            io.to(roomId).emit('room-info', {
+                hostId: rooms[roomId].hostId,
+                participants: rooms[roomId].participants,
+                polls: rooms[roomId].polls,
+                isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
+            });
+        });
+
+        socket.on('toggle-screen-share-permission', (allowed) => {
+            if (rooms[roomId].hostId !== user.userId) return;
+            rooms[roomId].isScreenShareAllowed = allowed;
+            io.to(roomId).emit('permission-updated', { type: 'screenShare', allowed });
+        });
+
+        socket.on('remote-mute', (targetUserId) => {
+            if (rooms[roomId].hostId !== user.userId) return;
+            io.to(roomId).emit('remote-mute-request', { targetUserId });
         });
 
         socket.on('vote-poll', (pIndex, oIndex) => {
@@ -79,7 +106,8 @@ io.on('connection', (socket) => {
                 io.to(roomId).emit('room-info', {
                     hostId: room.hostId,
                     participants: room.participants,
-                    polls: room.polls
+                    polls: room.polls,
+                    isScreenShareAllowed: room.isScreenShareAllowed
                 });
             }
         });
@@ -92,7 +120,8 @@ io.on('connection', (socket) => {
                     io.to(roomId).emit('room-info', {
                         hostId: rooms[roomId].hostId,
                         participants: rooms[roomId].participants,
-                        polls: rooms[roomId].polls
+                        polls: rooms[roomId].polls,
+                        isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
                     });
                 }
             }

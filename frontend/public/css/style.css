@@ -13,6 +13,62 @@
     --accent-color: #58a6ff;
 }
 
+/* SVG Icon Defaults */
+svg.lucide {
+    width: 24px;
+    height: 24px;
+    stroke: #c9d1d9;
+    /* Default text color */
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    vertical-align: middle;
+    overflow: visible;
+}
+
+.control-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.tab-btn svg {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+}
+
+.muted-indicator svg {
+    width: 16px;
+    height: 16px;
+    stroke: var(--danger-color);
+}
+
+.hand-raised-indicator svg {
+    width: 16px;
+    height: 16px;
+    stroke: var(--accent-color);
+}
+
+.copy-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.control-btn.danger svg {
+    stroke: #fff;
+}
+
+.control-btn.active svg {
+    stroke: var(--danger-color);
+}
+
+/* Specific fix for mic/video active state (which means muted in this app) */
+#toggleMic.active svg,
+#toggleVideo.active svg {
+    stroke: var(--danger-color);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -238,9 +294,32 @@ button {
 .meeting-code-display {
     padding: 0.5rem 1rem;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    font-family: monospace;
+    border-radius: 99px;
+    font-family: inherit;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.copy-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, opacity 0.2s;
+    opacity: 0.7;
+}
+
+.copy-btn:hover {
+    transform: scale(1.2);
+    opacity: 1;
 }
 
 .video-grid {
@@ -289,6 +368,59 @@ button {
     border-radius: 4px;
     font-size: 0.7rem;
     text-transform: uppercase;
+}
+
+.hand-raised-indicator {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 193, 7, 0.9);
+    color: #000;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+    animation: hand-pulse 2s infinite;
+    z-index: 5;
+}
+
+@keyframes hand-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+    }
+
+    70% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+}
+
+.muted-indicator {
+    position: absolute;
+    bottom: 3.5rem;
+    right: 1rem;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 5;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
 }
 
 .controls-bar {
@@ -384,6 +516,49 @@ button {
 .chat-input-area {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Effects Tab */
+.effects-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.effect-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.75rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.effect-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-color);
+}
+
+.effect-card.active {
+    border-color: var(--primary-color);
+    background: rgba(46, 160, 67, 0.15);
+}
+
+.effect-preview {
+    width: 100%;
+    aspect-ratio: 16/10;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.effect-card span {
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 /* Polls */
