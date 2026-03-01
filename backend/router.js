@@ -23,6 +23,14 @@ const router = (req, res) => {
         const authController = require('./controllers/authController');
         authController.googleLogin(req, res);
     }
+    else if (req.method === 'POST' && pathname === '/api/auth/register') {
+        const authController = require('./controllers/authController');
+        authController.register(req, res);
+    }
+    else if (req.method === 'POST' && pathname === '/api/auth/login') {
+        const authController = require('./controllers/authController');
+        authController.login(req, res);
+    }
     else if (req.method === 'POST' && pathname === '/api/meeting/create') {
         const meetingController = require('./controllers/meetingController');
         meetingController.createMeeting(req, res);
@@ -30,6 +38,12 @@ const router = (req, res) => {
     else if (req.method === 'POST' && pathname === '/api/livekit/token') {
         const livekitController = require('./controllers/livekitController');
         livekitController.generateToken(req, res);
+    }
+    else if (req.method === 'GET' && pathname === '/api/config') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            googleClientId: process.env.GOOGLE_CLIENT_ID
+        }));
     }
     else {
         // Serve static files from 'public' directory

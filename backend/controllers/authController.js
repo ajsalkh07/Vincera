@@ -1,4 +1,5 @@
 const { OAuth2Client } = require('google-auth-library');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -11,28 +12,42 @@ exports.googleLogin = async (req, res) => {
 
     req.on('end', async () => {
         try {
-            // BYPASS GOOGLE AUTH FOR TESTING
-            // Because of the 'invalid_client' error on Google's side, we will bypass the token 
-            // verification so you can test the video, audio, and chat features of the app.
+            const { idToken } = JSON.parse(body);
 
-            // Generate a random mock user or use a fixed one
-            const mockId = "mock_user_123";
-            const mockName = 'Test User';
-
-            // Upsert user
-            let user = await User.findOne({ googleId: mockId });
-            if (!user) {
-                user = await User.create({
-                    googleId: mockId,
-                    displayName: mockName,
-                    firstName: 'Test',
-                    lastName: 'User',
-                    image: 'https://ui-avatars.com/api/?name=Test+User',
-                    email: `test@example.com`
-                });
+            if (!idToken) {
+                throw new Error('No ID Token provided');
             }
 
-            // Create simple session token
+            // Verify the ID token
+            const ticket = await client.verifyIdToken({
+                idToken: idToken,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+
+            const payload = ticket.getPayload();
+            const { sub: googleId, email, name, picture, given_name, family_name } = payload;
+
+            // Upsert user in database
+            let user = await User.findOne({ googleId });
+            if (!user) {
+                user = await User.create({
+                    googleId,
+                    displayName: name,
+                    firstName: given_name,
+                    lastName: family_name,
+                    image: picture,
+                    email: email
+                });
+            } else {
+                // Update user info if it changed
+                user.displayName = name;
+                user.image = picture;
+                user.email = email;
+                await user.save();
+            }
+
+            // Create simple session token (Base64 encoded JSON for now, as per existing design)
+            // In a production app, use JWT or a secure session store.
             const sessionData = {
                 userId: user._id,
                 email: user.email,
@@ -41,6 +56,7 @@ exports.googleLogin = async (req, res) => {
             };
 
             const sessionToken = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+
             res.writeHead(200, {
                 'Content-Type': 'application/json',
                 'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
@@ -51,6 +67,77 @@ exports.googleLogin = async (req, res) => {
             console.error('Auth error:', error);
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: 'Authentication failed' }));
+        }
+    });
+};
+
+exports.register = async (req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        try {
+            const { email, password, name } = JSON.parse(body);
+            if (!email || !password || !name) throw new Error('Missing fields');
+
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'User already exists' }));
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const user = await User.create({
+                email,
+                password: hashedPassword,
+                displayName: name,
+                image: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`
+            });
+
+            const sessionData = { userId: user._id, email: user.email, name: user.displayName, picture: user.image };
+            const sessionToken = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
+            });
+            res.end(JSON.stringify({ success: true, user: sessionData }));
+        } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+    });
+};
+
+exports.login = async (req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+        try {
+            const { email, password } = JSON.parse(body);
+            const user = await User.findOne({ email });
+
+            if (!user || !user.password) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Invalid credentials' }));
+            }
+
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Invalid credentials' }));
+            }
+
+            const sessionData = { userId: user._id, email: user.email, name: user.displayName, picture: user.image };
+            const sessionToken = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
+            });
+            res.end(JSON.stringify({ success: true, user: sessionData }));
+        } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: error.message }));
         }
     });
 };

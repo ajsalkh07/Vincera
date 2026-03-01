@@ -4,24 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VINCERA - Meeting Room</title>
-    <link rel="stylesheet" href="/css/style.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <!-- Include LiveKit JS Client SDK via CDN (for now, usually bundled) -->
+    <title>VINCERA - Meeting</title>
+    <!-- LiveKit SDK from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/auth.js"></script>
 </head>
 
 <body class="room-body">
     <div class="main-room-container">
         <div class="video-grid-container">
+            <div class="meeting-header">
+                <div class="logo">VINCERA</div>
+                <div class="meeting-code-display">Meeting Code: <span id="meetingCode">Loading...</span></div>
+            </div>
+
             <div id="video-grid" class="video-grid">
-                <!-- Video elements will be injected here -->
+                <!-- Video tiles go here -->
             </div>
 
             <div class="controls-bar">
-                <button id="toggleMic" class="control-btn active">Mic</button>
-                <button id="toggleVideo" class="control-btn active">Cam</button>
-                <button id="toggleScreen" class="control-btn">Share</button>
+                <button id="toggleMic" class="control-btn active" title="Toggle Mic">🎤</button>
+                <button id="toggleVideo" class="control-btn active" title="Toggle Cam">📷</button>
+                <button id="toggleScreen" class="control-btn" title="Share Screen">💻</button>
                 <button id="leaveMeeting" class="control-btn danger">Leave</button>
             </div>
         </div>
@@ -34,6 +41,15 @@
             </div>
 
             <div id="participants" class="tab-content active">
+                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                    <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">Change Display Name</p>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="newNameInput" placeholder="New name..."
+                            style="margin-bottom: 0; padding: 0.5rem;">
+                        <button id="changeNameBtn" class="btn-primary"
+                            style="width: auto; padding: 0.5rem 1rem;">Update</button>
+                    </div>
+                </div>
                 <ul id="participantsList"></ul>
             </div>
 
@@ -41,18 +57,17 @@
                 <div id="chatMessages" class="chat-messages"></div>
                 <div class="chat-input-area">
                     <input type="text" id="chatInput" placeholder="Message everyone...">
-                    <button id="sendChat">Send</button>
+                    <button id="sendChat" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">Send</button>
                 </div>
             </div>
 
             <div id="polls" class="tab-content">
-                <div id="activePolls"></div>
-                <button id="createPollBtn" class="btn-secondary full-width">Create Poll</button>
+                <div id="activePolls" style="margin-bottom: 1.5rem;"></div>
+                <button id="createPollBtn" class="btn-secondary">Create New Poll</button>
             </div>
         </div>
     </div>
 
-    <script src="/js/auth.js"></script>
     <script src="/js/room.js"></script>
 </body>
 

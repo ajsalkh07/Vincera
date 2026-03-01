@@ -1,4 +1,4 @@
-// Basic room JS setup to be fleshed out with Socket.io and LiveKit later
+// Complete room.js with all features: host tracking, name change, join notifications, and polls.
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth()) return;
@@ -17,21 +17,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Leave logic
-    document.getElementById('leaveMeeting').addEventListener('click', () => {
-        if (room) {
-            room.disconnect();
-        }
-        window.location.href = '/dashboard';
-    });
-
     const roomName = window.location.pathname.split('/').pop();
+    const meetingCodeEl = document.getElementById('meetingCode');
+    const participantsList = document.getElementById('participantsList');
+    const chatMessages = document.getElementById('chatMessages');
+    const activePollsContainer = document.getElementById('activePolls');
+    const chatInput = document.getElementById('chatInput');
+
+    if (meetingCodeEl) meetingCodeEl.textContent = roomName;
+
+    // Socket.io and Session Initialization
+    const socket = io();
+    const userSession = JSON.parse(localStorage.getItem('userSession')) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
+
     let room;
+    let hostId = null;
+    let votedPolls = new Set();
 
     // Initialize LiveKit Room
     async function joinRoom() {
         try {
-            // Fetch token from our backend
             const response = await fetch('/api/livekit/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -40,207 +45,188 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (!data.success) {
-                alert('Failed to get room token');
+                alert(`Failed to get room token: ${data.error}`);
                 return;
             }
 
-            // Create new LiveKit room
-            room = new LivekitClient.Room({
-                adaptiveStream: true,
-                dynacast: true,
-            });
+            room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
 
-            // Set up event listeners for remote tracks
             room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-                if (track.kind === LivekitClient.Track.Kind.Video || track.kind === LivekitClient.Track.Kind.Audio) {
+                if (track.kind === LivekitClient.Track.Kind.Video) {
                     const element = track.attach();
-                    element.id = `track-${participant.sid}-${track.sid}`;
+                    const wrapper = document.createElement('div');
+                    wrapper.id = `wrapper-${participant.identity}`;
+                    wrapper.className = 'video-wrapper';
 
-                    if (track.kind === LivekitClient.Track.Kind.Video) {
-                        const wrapper = document.createElement('div');
-                        wrapper.id = `wrapper-${participant.sid}`;
-                        wrapper.className = 'video-wrapper';
-                        wrapper.style.position = 'relative';
+                    const nameLabel = document.createElement('div');
+                    nameLabel.className = 'participant-label';
+                    nameLabel.id = `label-${participant.identity}`;
+                    updateParticipantLabel(nameLabel, participant.name || participant.identity, participant.identity === hostId);
 
-                        const nameLabel = document.createElement('div');
-                        nameLabel.textContent = participant.identity;
-                        nameLabel.style.position = 'absolute';
-                        nameLabel.style.bottom = '10px';
-                        nameLabel.style.left = '10px';
-                        nameLabel.style.color = 'white';
-                        nameLabel.style.backgroundColor = 'rgba(0,0,0,0.5)';
-                        nameLabel.style.padding = '2px 8px';
-                        nameLabel.style.borderRadius = '4px';
-
-                        wrapper.appendChild(element);
-                        wrapper.appendChild(nameLabel);
-                        document.getElementById('video-grid').appendChild(wrapper);
-                    } else {
-                        // Audio elements don't need UI wrapper usually, just attach to body or hidden div
-                        document.body.appendChild(element);
-                    }
+                    wrapper.appendChild(element);
+                    wrapper.appendChild(nameLabel);
+                    document.getElementById('video-grid').appendChild(wrapper);
+                } else if (track.kind === LivekitClient.Track.Kind.Audio) {
+                    document.body.appendChild(track.attach());
                 }
             });
 
             room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
                 track.detach();
-                const wrapper = document.getElementById(`wrapper-${participant.sid}`);
+                const wrapper = document.getElementById(`wrapper-${participant.identity}`);
                 if (wrapper) wrapper.remove();
             });
 
-            // Connect to LiveKit Server
             await room.connect(data.url, data.token);
-            console.log('Connected to room', room.name);
-
-            // Publish local camera and mic
             await room.localParticipant.enableCameraAndMicrophone();
 
-            // Attach local video manually (since the event above is for REMOTES)
+            // Local Video
             const localVideoTrack = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
             if (localVideoTrack && localVideoTrack.videoTrack) {
                 const element = localVideoTrack.videoTrack.attach();
-                element.id = 'local-video';
-                element.muted = true; // Mute local video playback to avoid echo
-
                 const wrapper = document.createElement('div');
                 wrapper.className = 'video-wrapper';
-                wrapper.style.position = 'relative';
-
                 const nameLabel = document.createElement('div');
-                nameLabel.textContent = 'You';
-                nameLabel.style.position = 'absolute';
-                nameLabel.style.bottom = '10px';
-                nameLabel.style.left = '10px';
-                nameLabel.style.color = 'white';
-                nameLabel.style.backgroundColor = 'rgba(0,0,0,0.5)';
-                nameLabel.style.padding = '2px 8px';
-                nameLabel.style.borderRadius = '4px';
-
+                nameLabel.className = 'participant-label';
+                nameLabel.id = `label-${userSession.userId}`;
+                updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
                 wrapper.appendChild(element);
                 wrapper.appendChild(nameLabel);
                 document.getElementById('video-grid').appendChild(wrapper);
             }
 
-            // Setup basic Controls
-            document.getElementById('toggleMic').addEventListener('click', (e) => {
-                const isEnabled = room.localParticipant.isMicrophoneEnabled;
-                room.localParticipant.setMicrophoneEnabled(!isEnabled);
-                e.target.classList.toggle('active', !isEnabled);
-            });
+            // Controls
+            document.getElementById('toggleMic').onclick = () => {
+                const enabled = room.localParticipant.isMicrophoneEnabled;
+                room.localParticipant.setMicrophoneEnabled(!enabled);
+                document.getElementById('toggleMic').classList.toggle('active', !enabled);
+            };
+            document.getElementById('toggleVideo').onclick = () => {
+                const enabled = room.localParticipant.isCameraEnabled;
+                room.localParticipant.setCameraEnabled(!enabled);
+                document.getElementById('toggleVideo').classList.toggle('active', !enabled);
+            };
+            document.getElementById('toggleScreen').onclick = async () => {
+                const enabled = room.localParticipant.isScreenShareEnabled;
+                await room.localParticipant.setScreenShareEnabled(!enabled);
+                document.getElementById('toggleScreen').classList.toggle('active', !enabled);
+            };
+            document.getElementById('leaveMeeting').onclick = () => {
+                room.disconnect();
+                window.location.href = '/dashboard';
+            };
 
-            document.getElementById('toggleVideo').addEventListener('click', (e) => {
-                const isEnabled = room.localParticipant.isCameraEnabled;
-                room.localParticipant.setCameraEnabled(!isEnabled);
-                e.target.classList.toggle('active', !isEnabled);
-            });
-
-            document.getElementById('toggleScreen').addEventListener('click', async (e) => {
-                const isEnabled = room.localParticipant.isScreenShareEnabled;
-                await room.localParticipant.setScreenShareEnabled(!isEnabled);
-                e.target.classList.toggle('active', !isEnabled);
-            });
-
-        } catch (error) {
-            console.error('Error joining room:', error);
-            // More descriptive error for the user
-            let msg = 'Could not join the meeting.';
-            if (error.message.includes('token')) msg += ' (Invalid or missing token)';
-            else if (error.message.includes('connect')) msg += ' (Connection failed - check your LIVEKIT_URL)';
-            else if (error.message.includes('Permission')) msg += ' (Camera/Mic permission denied)';
-
-            alert(msg + '\n\nPlease check your browser console (F12) and ensure your backend .env file has valid LiveKit keys.');
+        } catch (e) {
+            console.error('Join error:', e);
+            alert('Error joining: ' + e.message);
         }
     }
 
     joinRoom();
 
-    // Socket.io Integration for Chat and Polls
-    const socket = io();
-    const userSession = JSON.parse(localStorage.getItem('userSession'));
-
+    // Socket Events
     socket.emit('join-room', roomName, userSession);
-
-    // Chat Logic
-    const chatInput = document.getElementById('chatInput');
-    const chatMessages = document.getElementById('chatMessages');
-
-    document.getElementById('sendChat').addEventListener('click', () => {
-        const msg = chatInput.value.trim();
-        if (msg) {
-            socket.emit('send-chat', msg);
-            chatInput.value = '';
-        }
-    });
-
-    socket.on('receive-chat', (data) => {
-        const div = document.createElement('div');
-        div.innerHTML = `<strong>${data.user.name}:</strong> <span>${data.message}</span>`;
-        div.style.marginBottom = '0.5rem';
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    // Participants List (Basic socket tracking)
-    const participantsList = document.getElementById('participantsList');
-
-    function addParticipantToList(user) {
-        const li = document.createElement('li');
-        li.id = `user-list-${user.userId}`;
-        li.textContent = user.name;
-        li.style.marginBottom = '0.5rem';
-        li.style.listStyle = 'none';
-        participantsList.appendChild(li);
-    }
-
-    // Add self to list
-    addParticipantToList(userSession);
 
     socket.on('user-connected', (user) => {
         addParticipantToList(user);
+        addSystemMessage(`${user.name} joined the meeting`);
     });
 
     socket.on('user-disconnected', (user) => {
         const el = document.getElementById(`user-list-${user.userId}`);
         if (el) el.remove();
+        addSystemMessage(`${user.name} left the meeting`);
     });
 
-    // Polls Logic
-    let polls = [];
-    const activePollsContainer = document.getElementById('activePolls');
+    socket.on('room-info', (info) => {
+        hostId = info.hostId;
+        // Update labels
+        const localLabel = document.getElementById(`label-${userSession.userId}`);
+        if (localLabel) updateParticipantLabel(localLabel, userSession.name + ' (You)', userSession.userId === hostId);
 
-    document.getElementById('createPollBtn').addEventListener('click', () => {
-        const question = prompt('Enter poll question:');
-        if (!question) return;
+        participantsList.innerHTML = '';
+        info.participants.forEach(p => addParticipantToList(p));
+
+        // Sync voted polls and render
+        votedPolls.clear();
+        if (info.polls) {
+            info.polls.forEach((poll, index) => {
+                if (poll.votedIds && poll.votedIds.includes(userSession.userId)) {
+                    votedPolls.add(index);
+                }
+            });
+            renderPolls(info.polls);
+        }
+    });
+
+    socket.on('name-updated', ({ userId, newName }) => {
+        const listEl = document.getElementById(`user-list-${userId}`);
+        if (listEl) listEl.textContent = newName + (userId === hostId ? ' (Host)' : '');
+
+        const labelEl = document.getElementById(`label-${userId}`);
+        if (labelEl) {
+            const isLocal = userId === userSession.userId;
+            updateParticipantLabel(labelEl, newName + (isLocal ? ' (You)' : ''), userId === hostId);
+        }
+    });
+
+    // Chat
+    document.getElementById('sendChat').onclick = () => {
+        const msg = chatInput.value.trim();
+        if (msg) {
+            socket.emit('send-chat', msg);
+            chatInput.value = '';
+        }
+    };
+
+    socket.on('receive-chat', (data) => {
+        const div = document.createElement('div');
+        div.innerHTML = `<strong style="color:var(--accent-color)">${data.user.name}:</strong> <span>${data.message}</span>`;
+        div.style.marginBottom = '0.5rem';
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    // Name Change UI
+    document.getElementById('changeNameBtn').onclick = () => {
+        const newName = document.getElementById('newNameInput').value.trim();
+        if (newName && newName !== userSession.name) {
+            userSession.name = newName;
+            localStorage.setItem('userSession', JSON.stringify(userSession));
+            socket.emit('change-name', newName);
+            document.getElementById('newNameInput').value = '';
+        }
+    };
+
+    // Polls
+    document.getElementById('createPollBtn').onclick = () => {
+        const question = prompt('Question:');
         const opt1 = prompt('Option 1:');
         const opt2 = prompt('Option 2:');
-
         if (question && opt1 && opt2) {
             socket.emit('create-poll', {
                 question,
                 options: [{ text: opt1, votes: 0 }, { text: opt2, votes: 0 }]
             });
         }
-    });
+    };
 
-    function renderPolls() {
+    function renderPolls(polls) {
         activePollsContainer.innerHTML = '';
         polls.forEach((poll, pIndex) => {
             const div = document.createElement('div');
-            div.style.backgroundColor = '#21262d';
-            div.style.padding = '1rem';
-            div.style.borderRadius = '6px';
-            div.style.marginBottom = '1rem';
-
+            div.className = 'poll-card';
             div.innerHTML = `<strong>${poll.question}</strong><br><br>`;
-
             poll.options.forEach((opt, oIndex) => {
                 const btn = document.createElement('button');
-                btn.className = 'btn-secondary full-width';
-                btn.style.marginBottom = '0.5rem';
-                btn.style.textAlign = 'left';
-                btn.innerHTML = `${opt.text} <span style="float:right">${opt.votes}</span>`;
+                btn.className = 'poll-btn';
+                btn.disabled = votedPolls.has(pIndex);
+                btn.innerHTML = `${opt.text} <span>${opt.votes}</span>`;
                 btn.onclick = () => {
-                    socket.emit('vote-poll', pIndex, oIndex);
+                    if (!votedPolls.has(pIndex)) {
+                        votedPolls.add(pIndex);
+                        socket.emit('vote-poll', pIndex, oIndex);
+                    }
                 };
                 div.appendChild(btn);
             });
@@ -248,15 +234,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    socket.on('new-poll', (pollData) => {
-        polls.push(pollData);
-        renderPolls();
-    });
 
-    socket.on('update-poll', ({ pollIndex, optionIndex }) => {
-        if (polls[pollIndex]) {
-            polls[pollIndex].options[optionIndex].votes++;
-            renderPolls();
-        }
-    });
+    // Helper Functions
+    function updateParticipantLabel(el, name, isHost) {
+        el.innerHTML = `<span>${name}</span>${isHost ? '<span class="host-badge">Host</span>' : ''}`;
+    }
+
+    function addParticipantToList(user) {
+        const li = document.createElement('li');
+        li.id = `user-list-${user.userId}`;
+        li.textContent = user.name + (user.userId === hostId ? ' (Host)' : '');
+        li.style.padding = '0.5rem';
+        li.style.listStyle = 'none';
+        li.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        participantsList.appendChild(li);
+    }
+
+    function addSystemMessage(text) {
+        const div = document.createElement('div');
+        div.className = 'system-msg';
+        div.textContent = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 });
