@@ -43,7 +43,10 @@ exports.generateToken = async (req, res) => {
 
             // make sure the room exists (LiveKit will auto-create by default but explicit call helps catch errors early)
             try {
-                await roomService.createRoom({ name: roomName });
+                await roomService.createRoom({
+                    name: roomName,
+                    maxParticipants: 100
+                });
             } catch (e) {
                 // ignore if the room already exists
                 if (!e.message || !e.message.includes('already exists')) {
@@ -69,7 +72,7 @@ exports.generateToken = async (req, res) => {
 
             console.log(`Generated token for room: ${roomName}, URL: ${livekitHost}`);
             // logging token is only for development / debugging
-            console.log(`Token (first 30 chars): ${token.slice(0,30)}...`);
+            console.log(`Token (first 30 chars): ${token.slice(0, 30)}...`);
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, token, identity: participantIdentity, url: livekitHost }));

@@ -64,6 +64,13 @@
                         <line x1="12" x2="12" y1="17" y2="21" />
                     </svg>
                 </button>
+                <div class="reactions-bar">
+                    <button class="reaction-btn" data-emoji="👏">👏</button>
+                    <button class="reaction-btn" data-emoji="❤️">❤️</button>
+                    <button class="reaction-btn" data-emoji="😂">😂</button>
+                    <button class="reaction-btn" data-emoji="👍">👍</button>
+                    <button class="reaction-btn" data-emoji="👋">👋</button>
+                </div>
                 <button id="leaveMeeting" class="control-btn danger">
                     <svg viewBox="0 0 24 24" class="lucide lucide-log-out">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -129,9 +136,20 @@
 
             <div id="chat" class="tab-content">
                 <div id="chatMessages" class="chat-messages"></div>
-                <div class="chat-input-area">
-                    <input type="text" id="chatInput" placeholder="Message everyone...">
-                    <button id="sendChat" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">Send</button>
+                <div class="chat-input-area" style="display: block;">
+                    <div class="chat-options"
+                        style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <label for="chatRecipient" style="font-size: 0.8rem; color: #8b949e;">To:</label>
+                        <select id="chatRecipient"
+                            style="background: rgba(255,255,255,0.05); border: 1px solid rgba(240,246,252,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; flex: 1;">
+                            <option value="everyone">Everyone</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                        <input type="text" id="chatInput" placeholder="Message...">
+                        <button id="sendChat" class="btn-primary"
+                            style="width: auto; padding: 0.5rem 1rem;">Send</button>
+                    </div>
                 </div>
             </div>
 

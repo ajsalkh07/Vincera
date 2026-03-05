@@ -4,7 +4,7 @@ const mime = require('mime-types');
 
 // Basic router implementation
 const router = (req, res) => {
-    console.log(`${req.method} ${req.url}`);
+    // console.log(`${req.method} ${req.url}`);
 
     // Parse URL
     const url = new URL(req.url, `http://${req.headers.host}`);

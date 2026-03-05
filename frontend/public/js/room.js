@@ -248,6 +248,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Sync Recipient Selector
+        const recSel = document.getElementById('chatRecipient');
+        if (recSel) {
+            const current = recSel.value;
+            recSel.innerHTML = '<option value="everyone">Everyone</option>';
+            info.participants.forEach(p => {
+                if (p.userId !== userSession.userId) {
+                    const opt = document.createElement('option');
+                    opt.value = p.userId;
+                    opt.textContent = p.name;
+                    recSel.appendChild(opt);
+                }
+            });
+            if (Array.from(recSel.options).some(o => o.value === current)) recSel.value = current;
+        }
+
         // Sync voted polls and render
         votedPolls.clear();
         if (info.polls) {

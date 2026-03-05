@@ -61,8 +61,18 @@ io.on('connection', (socket) => {
             }
         });
 
-        socket.on('send-chat', (message) => {
-            io.to(roomId).emit('receive-chat', { user, message });
+        socket.on('send-chat', (data) => {
+            const isPrivate = data.recipientId && data.recipientId !== 'everyone';
+            io.to(roomId).emit('receive-chat', {
+                user,
+                message: isPrivate ? data.message : (typeof data === 'string' ? data : data.message),
+                isPrivate,
+                recipientId: isPrivate ? data.recipientId : null
+            });
+        });
+
+        socket.on('send-reaction', (emoji) => {
+            io.to(roomId).emit('new-reaction', { userId: user.userId, emoji });
         });
 
         socket.on('raise-hand', (isRaised) => {
