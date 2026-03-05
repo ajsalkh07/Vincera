@@ -1,5 +1,5 @@
 const Meeting = require('../models/Meeting');
-const { v4: uuidv4 } = require('uuid');
+const { nanoid } = require('nanoid');
 
 exports.createMeeting = async (req, res) => {
     let body = '';
@@ -21,7 +21,7 @@ exports.createMeeting = async (req, res) => {
             const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString('ascii'));
 
             const { title } = JSON.parse(body || '{}');
-            const meetingId = uuidv4();
+            const meetingId = nanoid(10);
 
             // Create in DB
             const meeting = await Meeting.create({

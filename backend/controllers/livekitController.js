@@ -1,4 +1,5 @@
 const { RoomServiceClient, AccessToken } = require('livekit-server-sdk');
+const { nanoid } = require('nanoid');
 
 // Ensure Livekit credentials exist
 const livekitHost = (process.env.LIVEKIT_URL || 'ws://localhost:7880').trim();
@@ -31,12 +32,8 @@ exports.generateToken = async (req, res) => {
             const sessionCookie = cookies.split('; ').find(row => row.startsWith('session=')).split('=')[1];
             const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString('ascii'));
 
-            const { roomName } = JSON.parse(body || '{}');
-
-            if (!roomName) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                return res.end(JSON.stringify({ success: false, error: 'Missing roomName' }));
-            }
+            const { roomName: bodyRoomName } = JSON.parse(body || '{}');
+            const roomName = bodyRoomName || nanoid(10);
 
             const participantName = sessionData.name || 'Anonymous';
             const participantIdentity = sessionData.userId.toString() || `user_${Math.floor(Math.random() * 10000)}`;
