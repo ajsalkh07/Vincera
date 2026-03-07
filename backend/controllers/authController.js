@@ -18,7 +18,7 @@ exports.googleLogin = async (req, res) => {
                 throw new Error('No ID Token provided');
             }
 
-            // Verify the ID token
+            console.log('Verifying Google ID Token...');
             const ticket = await client.verifyIdToken({
                 idToken: idToken,
                 audience: process.env.GOOGLE_CLIENT_ID
@@ -26,10 +26,13 @@ exports.googleLogin = async (req, res) => {
 
             const payload = ticket.getPayload();
             const { sub: googleId, email, name, picture, given_name, family_name } = payload;
+            console.log('Token verified for:', email);
 
             // Upsert user in database
+            console.log('Querying database for user:', googleId);
             let user = await User.findOne({ googleId });
             if (!user) {
+                console.log('Creating new user:', email);
                 user = await User.create({
                     googleId,
                     displayName: name,
@@ -39,12 +42,14 @@ exports.googleLogin = async (req, res) => {
                     email: email
                 });
             } else {
+                console.log('Updating existing user:', email);
                 // Update user info if it changed
                 user.displayName = name;
                 user.image = picture;
                 user.email = email;
                 await user.save();
             }
+            console.log('User processed successfully');
 
             // Create simple session token (Base64 encoded JSON for now, as per existing design)
             // In a production app, use JWT or a secure session store.
@@ -64,9 +69,10 @@ exports.googleLogin = async (req, res) => {
             res.end(JSON.stringify({ success: true, user: sessionData }));
 
         } catch (error) {
-            console.error('Auth error:', error);
+            console.error('CRITICAL Auth error:', error.message);
+            console.error(error.stack);
             res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Authentication failed' }));
+            res.end(JSON.stringify({ success: false, error: 'Authentication failed: ' + error.message }));
         }
     });
 };
