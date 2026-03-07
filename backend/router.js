@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
+const mongoose = require('mongoose');
 
 // Basic router implementation
 const router = (req, res) => {
@@ -44,6 +45,14 @@ const router = (req, res) => {
         res.end(JSON.stringify({
             googleClientId: process.env.GOOGLE_CLIENT_ID
         }));
+    }
+    else if (req.method === 'GET' && pathname === '/api/db-status') {
+        const state = mongoose.connection.readyState;
+        const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+        const dbUri = process.env.MONGODB_URI || 'not set';
+        const maskedUri = dbUri.includes('@') ? dbUri.replace(/\/\/.*@/, '//****:****@') : dbUri;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: states[state] || 'unknown', maskedUri, timestamp: new Date().toISOString() }));
     }
     else {
         // Serve static files from 'public' directory
