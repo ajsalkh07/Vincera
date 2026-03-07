@@ -33,6 +33,23 @@ app.use(express.static(path.join(__dirname, '../frontend/public')));
 const router = require('./router');
 app.use('/', router);
 
+app.get('/api/db-status', (req, res) => {
+    const state = mongoose.connection.readyState;
+    const states = {
+        0: 'disconnected',
+        1: 'connected',
+        2: 'connecting',
+        3: 'disconnecting'
+    };
+
+    res.json({
+        success: true,
+        status: states[state] || 'unknown',
+        maskedUri: maskedUri,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // In-memory Room State
 const rooms = {};
 
