@@ -61,6 +61,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let hostId = null;
     let votedPolls = new Set();
     let isScreenShareAllowed = false;
+    let isWhiteboardOpen = false;
+    let isWhiteboardAllowedForAll = false;
+
+    // Whiteboard Variables
+    const wbOverlay = document.getElementById('whiteboard-overlay');
+    const wbCanvas = document.getElementById('whiteboard-canvas');
+    const wbCtx = wbCanvas.getContext('2d');
+    const wbColorInput = document.getElementById('wbColor');
+    const wbSizeInput = document.getElementById('wbBrushSize');
+    const wbClearBtn = document.getElementById('wbClear');
+    const wbCloseBtn = document.getElementById('wbClose');
+    const toggleWbBtn = document.getElementById('toggleWhiteboard');
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
 
     // Initialize LiveKit Room
     async function joinRoom() {
@@ -209,6 +225,19 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('room-info', (info) => {
         hostId = info.hostId;
         isScreenShareAllowed = info.isScreenShareAllowed || false;
+        isWhiteboardOpen = info.isWhiteboardOpen || false;
+        isWhiteboardAllowedForAll = info.isWhiteboardAllowedForAll || false;
+
+        // Sync Whiteboard Visibility
+        wbOverlay.classList.toggle('active', isWhiteboardOpen);
+        toggleWbBtn.classList.toggle('active', isWhiteboardOpen);
+
+        // Render previous drawing history
+        if (info.drawingHistory && info.drawingHistory.length > 0) {
+            // Need to ensure canvas is sized before drawing
+            resizeCanvas();
+            info.drawingHistory.forEach(data => drawOneLine(data, false));
+        }
 
         // Show/Hide poll creation button
         if (createPollBtn) {
@@ -237,6 +266,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             toggleDiv.querySelector('#screenSharePermToggle').onchange = (e) => {
                 socket.emit('toggle-screen-share-permission', e.target.checked);
+            };
+
+            // Whiteboard Permission Toggle
+            const wbToggleDiv = document.createElement('div');
+            wbToggleDiv.style.padding = '0.5rem';
+            wbToggleDiv.style.borderBottom = '1px solid var(--border-color)';
+            wbToggleDiv.style.display = 'flex';
+            wbToggleDiv.style.justifyContent = 'space-between';
+            wbToggleDiv.style.alignItems = 'center';
+            wbToggleDiv.innerHTML = `
+                <span style="font-size: 0.8rem;">Allow Whiteboard for All</span>
+                <input type="checkbox" id="wbPermToggle" ${isWhiteboardAllowedForAll ? 'checked' : ''}>
+            `;
+            participantsList.appendChild(wbToggleDiv);
+
+            wbToggleDiv.querySelector('#wbPermToggle').onchange = (e) => {
+                socket.emit('toggle-whiteboard-permission', e.target.checked);
             };
         }
 
@@ -307,6 +353,137 @@ document.addEventListener('DOMContentLoaded', () => {
             updateParticipantLabel(labelEl, newName + (isLocal ? ' (You)' : ''), userId === hostId);
         }
     });
+
+    socket.on('whiteboard-toggled', (isOpen) => {
+        isWhiteboardOpen = isOpen;
+        wbOverlay.classList.toggle('active', isOpen);
+        toggleWbBtn.classList.toggle('active', isOpen);
+        if (isOpen) resizeCanvas();
+    });
+
+    socket.on('whiteboard-permission-updated', (allowed) => {
+        isWhiteboardAllowedForAll = allowed;
+        if (!allowed && userSession.userId !== hostId && isWhiteboardOpen) {
+            addSystemMessage('The host has disabled drawing permissions.');
+        } else if (allowed && userSession.userId !== hostId && isWhiteboardOpen) {
+            addSystemMessage('The host has enabled drawing permissions for everyone.');
+        }
+    });
+
+    socket.on('user-draw', (data) => {
+        drawOneLine(data, false);
+    });
+
+    socket.on('whiteboard-cleared', () => {
+        wbCtx.clearRect(0, 0, wbCanvas.width, wbCanvas.height);
+    });
+
+    // Whiteboard Functions
+    function resizeCanvas() {
+        // Only resize if visible to avoid stretching
+        if (wbOverlay.classList.contains('active')) {
+            const rect = wbCanvas.getBoundingClientRect();
+            // Save current content
+            const temp = wbCtx.getImageData(0, 0, wbCanvas.width, wbCanvas.height);
+            wbCanvas.width = rect.width;
+            wbCanvas.height = rect.height;
+            // Restore content
+            wbCtx.putImageData(temp, 0, 0);
+        }
+    }
+
+    function drawOneLine(data, emit = true) {
+        wbCtx.beginPath();
+        wbCtx.moveTo(data.x0 * wbCanvas.width, data.y0 * wbCanvas.height);
+        wbCtx.lineTo(data.x1 * wbCanvas.width, data.y1 * wbCanvas.height);
+        wbCtx.strokeStyle = data.color;
+        wbCtx.lineWidth = data.size;
+        wbCtx.lineCap = 'round';
+        wbCtx.stroke();
+        wbCtx.closePath();
+
+        if (emit) {
+            socket.emit('draw', data);
+        }
+    }
+
+    function startDrawing(e) {
+        const isHost = userSession.userId === hostId;
+        if (!isHost && !isWhiteboardAllowedForAll) return;
+
+        isDrawing = true;
+        const rect = wbCanvas.getBoundingClientRect();
+        const x = (e.clientX || e.touches[0].clientX) - rect.left;
+        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+        lastX = x / wbCanvas.width;
+        lastY = y / wbCanvas.height;
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        const rect = wbCanvas.getBoundingClientRect();
+        const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+        const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+        const currentX = x / wbCanvas.width;
+        const currentY = y / wbCanvas.height;
+
+        drawOneLine({
+            x0: lastX,
+            y0: lastY,
+            x1: currentX,
+            y1: currentY,
+            color: wbColorInput.value,
+            size: wbSizeInput.value
+        });
+
+        lastX = currentX;
+        lastY = currentY;
+    }
+
+    function stopDrawing() {
+        isDrawing = false;
+    }
+
+    // Whiteboard Event Listeners
+    toggleWbBtn.onclick = () => {
+        if (userSession.userId !== hostId) {
+            // If not host, toggling only closes it locally if it's already open
+            // but the prompt says only Host can start/stop. 
+            // I'll make it so host toggles for ALL, and others can only view if open.
+            alert('Only the host can start or stop the whiteboard session.');
+            return;
+        }
+        const newState = !isWhiteboardOpen;
+        socket.emit('toggle-whiteboard', newState);
+    };
+
+    wbCloseBtn.onclick = () => {
+        if (userSession.userId === hostId) {
+            socket.emit('toggle-whiteboard', false);
+        } else {
+            wbOverlay.classList.remove('active');
+        }
+    };
+
+    wbClearBtn.onclick = () => {
+        if (userSession.userId !== hostId) {
+            alert('Only the host can clear the whiteboard.');
+            return;
+        }
+        socket.emit('clear-whiteboard');
+    };
+
+    wbCanvas.addEventListener('mousedown', startDrawing);
+    wbCanvas.addEventListener('mousemove', draw);
+    wbCanvas.addEventListener('mouseup', stopDrawing);
+    wbCanvas.addEventListener('mouseout', stopDrawing);
+
+    // Touch support
+    wbCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, { passive: false });
+    wbCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
+    wbCanvas.addEventListener('touchend', stopDrawing);
+
+    window.addEventListener('resize', resizeCanvas);
 
     // Chat
     document.getElementById('sendChat').onclick = () => {

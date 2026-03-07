@@ -661,3 +661,77 @@ button {
         grid-template-columns: 1fr;
     }
 }
+
+/* Whiteboard Overlay */
+.whiteboard-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(13, 17, 23, 0.9);
+    backdrop-filter: blur(20px);
+    z-index: 2000;
+    display: none;
+    /* Hidden by default */
+    flex-direction: column;
+    padding: 20px;
+}
+
+.whiteboard-overlay.active {
+    display: flex;
+}
+
+.whiteboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.whiteboard-header h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff 0%, #8b949e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.whiteboard-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.whiteboard-controls input[type="color"] {
+    width: 32px;
+    height: 32px;
+    border: none;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.whiteboard-controls select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+#whiteboard-canvas {
+    flex: 1;
+    background: #1c2128;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    cursor: crosshair;
+    touch-action: none;
+    /* Prevent scrolling on touch devices */
+}

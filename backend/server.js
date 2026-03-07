@@ -35,7 +35,10 @@ io.on('connection', (socket) => {
                 hostId: user.userId,
                 participants: [],
                 polls: [],
-                isScreenShareAllowed: false // Only host by default
+                isScreenShareAllowed: false, // Only host by default
+                isWhiteboardOpen: false,
+                isWhiteboardAllowedForAll: false,
+                drawingHistory: []
             };
         }
 
@@ -48,7 +51,10 @@ io.on('connection', (socket) => {
             hostId: rooms[roomId].hostId,
             participants: rooms[roomId].participants,
             polls: rooms[roomId].polls,
-            isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
+            isScreenShareAllowed: rooms[roomId].isScreenShareAllowed,
+            isWhiteboardOpen: rooms[roomId].isWhiteboardOpen,
+            isWhiteboardAllowedForAll: rooms[roomId].isWhiteboardAllowedForAll,
+            drawingHistory: rooms[roomId].drawingHistory
         });
 
         socket.to(roomId).emit('user-connected', user);
@@ -91,8 +97,39 @@ io.on('connection', (socket) => {
                 hostId: rooms[roomId].hostId,
                 participants: rooms[roomId].participants,
                 polls: rooms[roomId].polls,
-                isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
+                isScreenShareAllowed: rooms[roomId].isScreenShareAllowed,
+                isWhiteboardOpen: rooms[roomId].isWhiteboardOpen,
+                isWhiteboardAllowedForAll: rooms[roomId].isWhiteboardAllowedForAll
             });
+        });
+
+        socket.on('toggle-whiteboard', (isOpen) => {
+            if (rooms[roomId].hostId !== user.userId) return;
+            rooms[roomId].isWhiteboardOpen = isOpen;
+            io.to(roomId).emit('whiteboard-toggled', isOpen);
+        });
+
+        socket.on('toggle-whiteboard-permission', (allowed) => {
+            if (rooms[roomId].hostId !== user.userId) return;
+            rooms[roomId].isWhiteboardAllowedForAll = allowed;
+            io.to(roomId).emit('whiteboard-permission-updated', allowed);
+        });
+
+        socket.on('draw', (drawData) => {
+            const room = rooms[roomId];
+            if (!room) return;
+            // Check permission
+            const isHost = room.hostId === user.userId;
+            if (!isHost && !room.isWhiteboardAllowedForAll) return;
+
+            room.drawingHistory.push(drawData);
+            socket.to(roomId).emit('user-draw', drawData);
+        });
+
+        socket.on('clear-whiteboard', () => {
+            if (rooms[roomId].hostId !== user.userId) return;
+            rooms[roomId].drawingHistory = [];
+            io.to(roomId).emit('whiteboard-cleared');
         });
 
         socket.on('toggle-screen-share-permission', (allowed) => {
@@ -131,8 +168,14 @@ io.on('connection', (socket) => {
                         hostId: rooms[roomId].hostId,
                         participants: rooms[roomId].participants,
                         polls: rooms[roomId].polls,
-                        isScreenShareAllowed: rooms[roomId].isScreenShareAllowed
+                        isScreenShareAllowed: rooms[roomId].isScreenShareAllowed,
+                        isWhiteboardOpen: rooms[roomId].isWhiteboardOpen,
+                        isWhiteboardAllowedForAll: rooms[roomId].isWhiteboardAllowedForAll
                     });
+                }
+                // Clear drawing history if room is empty
+                if (rooms[roomId].participants.length === 0) {
+                    delete rooms[roomId];
                 }
             }
             socket.to(roomId).emit('user-disconnected', user);
