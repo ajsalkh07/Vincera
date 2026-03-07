@@ -1,5 +1,4 @@
 const { RoomServiceClient, AccessToken } = require('livekit-server-sdk');
-const { nanoid } = require('nanoid');
 
 // Ensure Livekit credentials exist
 const livekitHost = (process.env.LIVEKIT_URL || 'ws://localhost:7880').trim();
@@ -32,18 +31,19 @@ exports.generateToken = async (req, res) => {
             const sessionCookie = cookies.split('; ').find(row => row.startsWith('session=')).split('=')[1];
             const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString('ascii'));
 
-            const { roomName: bodyRoomName } = JSON.parse(body || '{}');
-            const roomName = bodyRoomName || nanoid(10);
+            const { roomName } = JSON.parse(body || '{}');
+
+            if (!roomName) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Missing roomName' }));
+            }
 
             const participantName = sessionData.name || 'Anonymous';
             const participantIdentity = sessionData.userId.toString() || `user_${Math.floor(Math.random() * 10000)}`;
 
             // make sure the room exists (LiveKit will auto-create by default but explicit call helps catch errors early)
             try {
-                await roomService.createRoom({
-                    name: roomName,
-                    maxParticipants: 100
-                });
+                await roomService.createRoom({ name: roomName });
             } catch (e) {
                 // ignore if the room already exists
                 if (!e.message || !e.message.includes('already exists')) {
@@ -69,7 +69,7 @@ exports.generateToken = async (req, res) => {
 
             console.log(`Generated token for room: ${roomName}, URL: ${livekitHost}`);
             // logging token is only for development / debugging
-            console.log(`Token (first 30 chars): ${token.slice(0, 30)}...`);
+            console.log(`Token (first 30 chars): ${token.slice(0,30)}...`);
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, token, identity: participantIdentity, url: livekitHost }));
