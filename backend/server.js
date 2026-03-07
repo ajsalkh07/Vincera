@@ -12,9 +12,21 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 // DB Connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+const dbUri = process.env.MONGODB_URI || 'not set';
+const maskedUri = dbUri.includes('@')
+    ? dbUri.replace(/\/\/.*@/, '//****:****@')
+    : dbUri;
+
+console.log('Attempting to connect to MongoDB with URI:', maskedUri);
+
+mongoose.connect(dbUri)
+    .then(() => console.log('Connected to MongoDB successfully'))
+    .catch(err => {
+        console.error('MongoDB connection error details:', err.message);
+        if (err.message.includes('buffering timed out')) {
+            console.error('CRITICAL: Mongoose is buffering but cannot reach the database. Check your MONGODB_URI and Network Access (0.0.0.0/0) in Atlas.');
+        }
+    });
 
 app.use(express.static(path.join(__dirname, '../frontend/public')));
 
