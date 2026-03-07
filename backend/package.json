@@ -2,7 +2,7 @@
   "name": "vincera",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -15,6 +15,7 @@
     "bcryptjs": "^3.0.3",
     "cookie": "^1.1.1",
     "dotenv": "^17.3.1",
+    "express": "^4.18.2",
     "google-auth-library": "^10.6.1",
     "livekit-server-sdk": "^2.15.0",
     "mime-types": "^3.0.2",
