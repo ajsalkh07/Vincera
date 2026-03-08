@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Socket.io and Session Initialization
     const socket = io();
-    const userSession = JSON.parse(localStorage.getItem('userSession')) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
+    const userSession = JSON.parse(sessionStorage.getItem(getSessionKey())) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
 
     let room;
     let hostId = null;
@@ -84,7 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/livekit/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomName })
+                body: JSON.stringify({
+                    roomName,
+                    identity: userSession.userId,
+                    name: userSession.name
+                })
             });
             const data = await response.json();
 
@@ -507,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newName = document.getElementById('newNameInput').value.trim();
         if (newName && newName !== userSession.name) {
             userSession.name = newName;
-            localStorage.setItem('userSession', JSON.stringify(userSession));
+            sessionStorage.setItem(getSessionKey(), JSON.stringify(userSession));
             socket.emit('change-name', newName);
             document.getElementById('newNameInput').value = '';
         }

@@ -1,5 +1,31 @@
 // auth.js - Authentication handlers for VINCERA
 
+function getTabId() {
+    // If window.name is empty or doesn't have our prefix, it's a new or unknown tab.
+    if (!window.name || !window.name.startsWith('vincera_tab_')) {
+        window.name = 'vincera_tab_' + Math.random().toString(36).substr(2, 9);
+        console.log('New Tab ID generated:', window.name);
+    }
+    return window.name;
+}
+
+// Crucial: Call this before storing a NEW session to ensure this tab uses a unique key
+function resetTabId() {
+    const oldId = window.name;
+    window.name = 'vincera_tab_' + Math.random().toString(36).substr(2, 9);
+    console.log('Tab ID reset from', oldId, 'to', window.name);
+    return window.name;
+}
+
+function getSessionKey() {
+    return `userSession_${getTabId()}`;
+}
+
+// Ensure login page always starts with a fresh Tab ID to prevent identity inheritance
+if (window.location.pathname === '/' || window.location.pathname === '/login.html') {
+    resetTabId();
+}
+
 function handleCredentialResponse(response) {
     // response.credential is the JWT ID Token from Google
     fetch('/api/auth/google', {
@@ -10,7 +36,9 @@ function handleCredentialResponse(response) {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                localStorage.setItem('userSession', JSON.stringify(data.user));
+                // Force a new Tab ID to prevent collision with any cloned tabs
+                resetTabId();
+                sessionStorage.setItem(getSessionKey(), JSON.stringify(data.user));
                 window.location.href = '/dashboard';
             } else {
                 alert('Google Login Failed: ' + (data.error || 'Unknown error'));
@@ -32,7 +60,9 @@ async function handleEmailLogin(event) {
         });
         const data = await res.json();
         if (data.success) {
-            localStorage.setItem('userSession', JSON.stringify(data.user));
+            // Force a new Tab ID to prevent collision with any cloned tabs
+            resetTabId();
+            sessionStorage.setItem(getSessionKey(), JSON.stringify(data.user));
             window.location.href = '/dashboard';
         } else {
             alert(data.error || 'Login failed');
@@ -56,7 +86,9 @@ async function handleEmailRegister(event) {
         });
         const data = await res.json();
         if (data.success) {
-            localStorage.setItem('userSession', JSON.stringify(data.user));
+            // Force a new Tab ID to prevent collision with any cloned tabs
+            resetTabId();
+            sessionStorage.setItem(getSessionKey(), JSON.stringify(data.user));
             window.location.href = '/dashboard';
         } else {
             alert(data.error || 'Registration failed');
@@ -67,7 +99,7 @@ async function handleEmailRegister(event) {
 }
 
 function checkAuth() {
-    const session = localStorage.getItem('userSession');
+    const session = sessionStorage.getItem(getSessionKey());
     if (!session) {
         window.location.href = '/';
         return false;
@@ -83,7 +115,7 @@ function checkAuth() {
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('userSession');
+        sessionStorage.removeItem(getSessionKey());
         // Clear session cookie
         document.cookie = "session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         window.location.href = '/';

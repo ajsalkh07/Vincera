@@ -37,17 +37,17 @@ exports.generateToken = async (req, res) => {
                 return res.end(JSON.stringify({ success: false, error: 'Unauthorized: Invalid session' }));
             }
 
-            const { roomName } = JSON.parse(body || '{}');
+            const { roomName, identity: clientIdentity, name: clientName } = JSON.parse(body || '{}');
 
             if (!roomName) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 return res.end(JSON.stringify({ success: false, error: 'Missing roomName' }));
             }
 
-            const participantName = sessionData.name || 'Anonymous';
-            const participantIdentity = sessionData.userId ? sessionData.userId.toString() : `user_${Math.floor(Math.random() * 10000)}`;
+            const participantName = clientName || sessionData.name || 'Anonymous';
+            const participantIdentity = clientIdentity || (sessionData.userId ? sessionData.userId.toString() : `user_${Math.floor(Math.random() * 10000)}`);
 
-            console.log(`Generating token for ${participantName} in room ${roomName}...`);
+            console.log(`Generating token for ${participantName} (ID: ${participantIdentity}) in room ${roomName}...`);
 
             // Check if LiveKit keys are present
             if (!livekitApiKey || !livekitApiSecret) {

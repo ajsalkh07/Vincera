@@ -20,15 +20,17 @@ exports.createMeeting = async (req, res) => {
             const sessionCookie = cookies.split('; ').find(row => row.startsWith('session=')).split('=')[1];
             const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString('ascii'));
 
-            const { title } = JSON.parse(body || '{}');
+            const { title, hostId: clientHostId } = JSON.parse(body || '{}');
             const meetingId = nanoid(10);
+
+            const finalHostId = clientHostId || sessionData.userId;
 
             // Create in DB
             const meeting = await Meeting.create({
                 meetingId,
-                hostId: sessionData.userId,
+                hostId: finalHostId,
                 title: title || 'New VINCERA Meeting',
-                participants: [sessionData.userId]
+                participants: [finalHostId]
             });
 
             res.writeHead(200, { 'Content-Type': 'application/json' });

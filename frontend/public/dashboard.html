@@ -37,11 +37,15 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (!checkAuth()) return;
-            const user = JSON.parse(localStorage.getItem('userSession'));
+            const user = JSON.parse(sessionStorage.getItem(getSessionKey()));
             document.getElementById('userName').textContent = user.name;
 
             document.getElementById('createMeetingBtn').onclick = async () => {
-                const response = await fetch('/api/meeting/create', { method: 'POST' });
+                const response = await fetch('/api/meeting/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hostId: user.userId })
+                });
                 const data = await response.json();
                 if (data.success) window.location.href = `/room/${data.meetingId}`;
             };
