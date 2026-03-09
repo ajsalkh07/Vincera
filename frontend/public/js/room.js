@@ -57,6 +57,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
     const userSession = JSON.parse(sessionStorage.getItem(getSessionKey())) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
 
+    const zoomOverlay = document.getElementById('zoom-overlay');
+    if (zoomOverlay) {
+        console.log('Zoom overlay initialized');
+        zoomOverlay.addEventListener('click', () => {
+            console.log('Overlay clicked, closing zoom');
+            document.querySelectorAll('.video-wrapper.zoomed').forEach(el => el.classList.remove('zoomed'));
+            zoomOverlay.classList.remove('active');
+        });
+    }
+
+    function setupZoom(wrapper) {
+        if (!wrapper) return;
+        console.log('Setting up zoom for wrapper:', wrapper.id);
+        wrapper.addEventListener('click', (e) => {
+            console.log('Video wrapper clicked:', wrapper.id);
+            const isZoomed = wrapper.classList.contains('zoomed');
+
+            document.querySelectorAll('.video-wrapper.zoomed').forEach(el => el.classList.remove('zoomed'));
+
+            if (!isZoomed && zoomOverlay) {
+                console.log('Zooming in:', wrapper.id);
+                wrapper.classList.add('zoomed');
+                zoomOverlay.classList.add('active');
+            } else if (zoomOverlay) {
+                console.log('Zooming out:', wrapper.id);
+                zoomOverlay.classList.remove('active');
+            }
+        });
+    }
+
     let room;
     let hostId = null;
     let votedPolls = new Set();
@@ -114,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     wrapper.appendChild(element);
                     wrapper.appendChild(nameLabel);
                     document.getElementById('video-grid').appendChild(wrapper);
+                    setupZoom(wrapper);
 
                     // Check if already muted
                     const audioPub = participant.getTrackPublication(LivekitClient.Track.Source.Microphone);
@@ -143,6 +174,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (wrapper) wrapper.remove();
             });
 
+            room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+                console.log('Active speakers changed:', speakers.map(s => s.identity));
+                if (speakers && speakers.length > 0) {
+                    const dominantSpeaker = speakers[0];
+                    const wrapper = document.getElementById(`wrapper-${dominantSpeaker.identity}`);
+                    if (wrapper) {
+                        const grid = document.getElementById('video-grid');
+                        if (grid.firstChild !== wrapper) {
+                            console.log('Moving dominant speaker to front:', dominantSpeaker.identity);
+                            grid.prepend(wrapper);
+                        }
+                    } else {
+                        console.warn('Could not find wrapper for speaker:', dominantSpeaker.identity);
+                    }
+                }
+            });
+
             await room.connect(data.url, data.token);
             await room.localParticipant.enableCameraAndMicrophone();
 
@@ -160,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.appendChild(element);
                 wrapper.appendChild(nameLabel);
                 document.getElementById('video-grid').appendChild(wrapper);
+                setupZoom(wrapper);
             }
 
             // Controls

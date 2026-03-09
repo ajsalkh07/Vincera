@@ -397,6 +397,46 @@ button {
     position: relative;
     aspect-ratio: 16/9;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.video-wrapper:hover {
+    border-color: var(--primary-color);
+}
+
+.video-wrapper.zoomed {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    height: 85vh;
+    max-width: 1400px;
+    z-index: 1001;
+    background: #000;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    cursor: zoom-out;
+}
+
+#zoom-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#zoom-overlay.active {
+    display: block;
+    opacity: 1;
 }
 
 .video-wrapper video {
