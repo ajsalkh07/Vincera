@@ -1,2 +1,2 @@
 # projectZ
-vidio conferencing app
+video conferencing app
