@@ -775,3 +775,109 @@ button {
     touch-action: none;
     /* Prevent scrolling on touch devices */
 }
+
+/* Pre-Join Lobby */
+.pre-join-lobby {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    width: 100vw;
+}
+
+.lobby-content {
+    display: flex;
+    max-width: 1000px;
+    width: 90%;
+    gap: 3rem;
+    align-items: center;
+}
+
+.lobby-video-container {
+    flex: 1.5;
+    background: #202124;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16/9;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.lobby-video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.lobby-empty-avatar {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #3c4043;
+}
+
+.lobby-empty-avatar svg {
+    width: 80px;
+    height: 80px;
+    stroke: #9aa0a6;
+}
+
+.lobby-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1rem;
+}
+
+.lobby-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    text-align: center;
+}
+
+.lobby-info h2 {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+    background: none;
+    -webkit-text-fill-color: initial;
+    color: var(--text-color);
+}
+
+.lobby-info p {
+    color: var(--secondary-text);
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+}
+
+.join-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .lobby-content {
+        flex-direction: column;
+        gap: 2rem;
+    }
+}

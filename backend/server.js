@@ -71,8 +71,13 @@ io.on('connection', (socket) => {
             };
         }
 
-        if (!rooms[roomId].participants.find(p => p.userId === user.userId)) {
+        user.socketId = socket.id;
+        const existingParticipant = rooms[roomId].participants.find(p => p.userId === user.userId);
+        if (!existingParticipant) {
             rooms[roomId].participants.push(user);
+        } else {
+            existingParticipant.socketId = socket.id;
+            Object.assign(existingParticipant, user);
         }
 
         // Emit room info only to the joiner
@@ -98,12 +103,22 @@ io.on('connection', (socket) => {
 
         socket.on('send-chat', (data) => {
             const isPrivate = data.recipientId && data.recipientId !== 'everyone';
-            io.to(roomId).emit('receive-chat', {
+            const messagePayload = {
                 user,
-                message: isPrivate ? data.message : (typeof data === 'string' ? data : data.message),
+                message: typeof data === 'string' ? data : data.message,
                 isPrivate,
                 recipientId: isPrivate ? data.recipientId : null
-            });
+            };
+
+            if (isPrivate) {
+                const recipient = rooms[roomId].participants.find(p => p.userId === data.recipientId);
+                if (recipient && recipient.socketId) {
+                    io.to(recipient.socketId).emit('receive-chat', messagePayload);
+                    socket.emit('receive-chat', messagePayload);
+                }
+            } else {
+                io.to(roomId).emit('receive-chat', messagePayload);
+            }
         });
 
         socket.on('send-reaction', (emoji) => {

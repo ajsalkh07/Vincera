@@ -108,6 +108,77 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastX = 0;
     let lastY = 0;
 
+    let isLobbyMicEnabled = true;
+    let isLobbyCamEnabled = true;
+    let localStream = null;
+
+    // Initialize Pre-join Lobby
+    async function initPreJoin() {
+        const lobbyVideo = document.getElementById('lobbyVideoPreview');
+        const emptyAvatar = document.querySelector('.lobby-empty-avatar');
+        const lobbyMicBtn = document.getElementById('lobbyToggleMic');
+        const lobbyCamBtn = document.getElementById('lobbyToggleCam');
+        document.getElementById('lobbyMeetingCode').textContent = roomName;
+
+        lobbyMicBtn.innerHTML = ICONS.mic;
+        lobbyCamBtn.innerHTML = ICONS.video;
+
+        async function startPreview() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: isLobbyCamEnabled, audio: isLobbyMicEnabled });
+                lobbyVideo.srcObject = localStream;
+                emptyAvatar.style.display = 'none';
+                lobbyVideo.style.display = 'block';
+            } catch (err) {
+                console.error("Error accessing media devices.", err);
+                emptyAvatar.style.display = 'flex';
+                lobbyVideo.style.display = 'none';
+                isLobbyCamEnabled = false;
+                isLobbyMicEnabled = false;
+                lobbyMicBtn.classList.add('active');
+                lobbyCamBtn.classList.add('active');
+                lobbyMicBtn.innerHTML = ICONS.micOff;
+                lobbyCamBtn.innerHTML = ICONS.videoOff;
+            }
+        }
+
+        lobbyMicBtn.onclick = () => {
+            isLobbyMicEnabled = !isLobbyMicEnabled;
+            lobbyMicBtn.classList.toggle('active', !isLobbyMicEnabled);
+            lobbyMicBtn.innerHTML = !isLobbyMicEnabled ? ICONS.micOff : ICONS.mic;
+            if (localStream && localStream.getAudioTracks().length > 0) {
+                localStream.getAudioTracks()[0].enabled = isLobbyMicEnabled;
+            }
+        };
+
+        lobbyCamBtn.onclick = async () => {
+            isLobbyCamEnabled = !isLobbyCamEnabled;
+            lobbyCamBtn.classList.toggle('active', !isLobbyCamEnabled);
+            lobbyCamBtn.innerHTML = !isLobbyCamEnabled ? ICONS.videoOff : ICONS.video;
+
+            if (isLobbyCamEnabled) {
+                await startPreview();
+            } else {
+                if (localStream && localStream.getVideoTracks().length > 0) {
+                    localStream.getVideoTracks().forEach(t => t.stop());
+                }
+                emptyAvatar.style.display = 'flex';
+                lobbyVideo.style.display = 'none';
+            }
+        };
+
+        document.getElementById('btnJoinNow').onclick = () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('preJoinLobby').style.display = 'none';
+            document.getElementById('mainRoomContainer').style.display = 'flex';
+            joinRoom();
+        };
+
+        await startPreview();
+    }
+
     // Initialize LiveKit Room
     async function joinRoom() {
         try {
@@ -192,23 +263,38 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             await room.connect(data.url, data.token);
-            await room.localParticipant.enableCameraAndMicrophone();
+
+            // Respect lobby settings
+            await room.localParticipant.setMicrophoneEnabled(isLobbyMicEnabled);
+            await room.localParticipant.setCameraEnabled(isLobbyCamEnabled);
+
+            // Update bottom control bar UI to match lobby settings
+            const mainMicBtn = document.getElementById('toggleMic');
+            const mainCamBtn = document.getElementById('toggleVideo');
+
+            mainMicBtn.classList.toggle('active', !isLobbyMicEnabled);
+            mainMicBtn.innerHTML = !isLobbyMicEnabled ? ICONS.micOff : ICONS.mic;
+
+            mainCamBtn.classList.toggle('active', !isLobbyCamEnabled);
+            mainCamBtn.innerHTML = !isLobbyCamEnabled ? ICONS.videoOff : ICONS.video;
 
             // Local Video
-            const localVideoTrack = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
-            if (localVideoTrack && localVideoTrack.videoTrack) {
-                const element = localVideoTrack.videoTrack.attach();
-                const wrapper = document.createElement('div');
-                wrapper.id = `wrapper-${userSession.userId}`;
-                wrapper.className = 'video-wrapper';
-                const nameLabel = document.createElement('div');
-                nameLabel.className = 'participant-label';
-                nameLabel.id = `label-${userSession.userId}`;
-                updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
-                wrapper.appendChild(element);
-                wrapper.appendChild(nameLabel);
-                document.getElementById('video-grid').appendChild(wrapper);
-                setupZoom(wrapper);
+            if (isLobbyCamEnabled) {
+                const localVideoTrack = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
+                if (localVideoTrack && localVideoTrack.videoTrack) {
+                    const element = localVideoTrack.videoTrack.attach();
+                    const wrapper = document.createElement('div');
+                    wrapper.id = `wrapper-${userSession.userId}`;
+                    wrapper.className = 'video-wrapper';
+                    const nameLabel = document.createElement('div');
+                    nameLabel.className = 'participant-label';
+                    nameLabel.id = `label-${userSession.userId}`;
+                    updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
+                    wrapper.appendChild(element);
+                    wrapper.appendChild(nameLabel);
+                    document.getElementById('video-grid').appendChild(wrapper);
+                    setupZoom(wrapper);
+                }
             }
 
             // Controls
@@ -217,20 +303,70 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.emit('raise-hand', isHandRaised);
                 document.getElementById('toggleHand').classList.toggle('active', isHandRaised);
             };
-            document.getElementById('toggleMic').onclick = () => {
+            document.getElementById('toggleMic').onclick = async () => {
                 const enabled = room.localParticipant.isMicrophoneEnabled;
-                room.localParticipant.setMicrophoneEnabled(!enabled);
-                const btn = document.getElementById('toggleMic');
-                btn.classList.toggle('active', !enabled);
-                btn.innerHTML = !enabled ? ICONS.micOff : ICONS.mic;
-                updateMuteUI(userSession.userId, enabled); // Instantly show for self
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(!enabled);
+                    const btn = document.getElementById('toggleMic');
+                    btn.classList.toggle('active', enabled);
+                    btn.innerHTML = enabled ? ICONS.micOff : ICONS.mic;
+                    updateMuteUI(userSession.userId, enabled); // Instantly show for self
+                } catch (err) {
+                    console.error('Error toggling mic:', err);
+                }
             };
-            document.getElementById('toggleVideo').onclick = () => {
+            document.getElementById('toggleVideo').onclick = async () => {
                 const enabled = room.localParticipant.isCameraEnabled;
-                room.localParticipant.setCameraEnabled(!enabled);
-                const btn = document.getElementById('toggleVideo');
-                btn.classList.toggle('active', !enabled);
-                btn.innerHTML = !enabled ? ICONS.videoOff : ICONS.video;
+                try {
+                    await room.localParticipant.setCameraEnabled(!enabled);
+                    const btn = document.getElementById('toggleVideo');
+                    btn.classList.toggle('active', enabled);
+                    btn.innerHTML = enabled ? ICONS.videoOff : ICONS.video;
+
+                    let wrapper = document.getElementById(`wrapper-${userSession.userId}`);
+
+                    if (!enabled) { // Turned camera ON
+                        if (!wrapper) {
+                            wrapper = document.createElement('div');
+                            wrapper.id = `wrapper-${userSession.userId}`;
+                            wrapper.className = 'video-wrapper';
+                            const nameLabel = document.createElement('div');
+                            nameLabel.className = 'participant-label';
+                            nameLabel.id = `label-${userSession.userId}`;
+                            updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
+                            wrapper.appendChild(nameLabel);
+                            document.getElementById('video-grid').appendChild(wrapper);
+                            setupZoom(wrapper);
+
+                            // Restore UI state
+                            if (!room.localParticipant.isMicrophoneEnabled) {
+                                updateMuteUI(userSession.userId, true);
+                            }
+                            if (isHandRaised) {
+                                updateHandUI(userSession.userId, true);
+                            }
+                        }
+
+                        const pub = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
+                        if (pub && pub.videoTrack) {
+                            const existingVid = wrapper.querySelector('video');
+                            if (existingVid) existingVid.remove();
+                            const element = pub.videoTrack.attach();
+                            wrapper.insertBefore(element, wrapper.firstChild);
+
+                            if (backgroundProcessor) {
+                                try { await pub.videoTrack.setProcessor(backgroundProcessor); }
+                                catch (e) { console.error("Could not reapply effect", e); }
+                            }
+                        }
+                    } else { // Turned camera OFF
+                        if (wrapper) {
+                            wrapper.remove();
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error toggling video:', err);
+                }
             };
             document.getElementById('toggleScreen').onclick = async () => {
                 const isHost = userSession.userId === hostId;
@@ -253,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    joinRoom();
+    initPreJoin();
 
     let isHandRaised = false;
 
@@ -267,12 +403,34 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('user-connected', (user) => {
         addParticipantToList(user);
         addSystemMessage(`${user.name} joined the meeting`);
+
+        // Add to chat recipient dropdown
+        const recSel = document.getElementById('chatRecipient');
+        if (recSel && user.userId !== userSession.userId) {
+            let exists = Array.from(recSel.options).some(o => o.value === user.userId);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = user.userId;
+                opt.textContent = user.name;
+                recSel.appendChild(opt);
+            }
+        }
     });
 
     socket.on('user-disconnected', (user) => {
         const el = document.getElementById(`user-list-${user.userId}`);
         if (el) el.remove();
         addSystemMessage(`${user.name} left the meeting`);
+
+        // Remove from chat recipient dropdown
+        const recSel = document.getElementById('chatRecipient');
+        if (recSel) {
+            const opt = Array.from(recSel.options).find(o => o.value === user.userId);
+            if (opt) {
+                if (recSel.value === user.userId) recSel.value = 'everyone';
+                opt.remove();
+            }
+        }
     });
 
     socket.on('room-info', (info) => {
@@ -404,6 +562,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (labelEl) {
             const isLocal = userId === userSession.userId;
             updateParticipantLabel(labelEl, newName + (isLocal ? ' (You)' : ''), userId === hostId);
+        }
+
+        // Update chat recipient dropdown
+        const recSel = document.getElementById('chatRecipient');
+        if (recSel) {
+            const opt = Array.from(recSel.options).find(o => o.value === userId);
+            if (opt) {
+                opt.textContent = newName;
+            }
         }
     });
 
@@ -541,15 +708,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chat
     document.getElementById('sendChat').onclick = () => {
         const msg = chatInput.value.trim();
+        const recipientSel = document.getElementById('chatRecipient');
+        const recipientId = recipientSel ? recipientSel.value : 'everyone';
         if (msg) {
-            socket.emit('send-chat', msg);
+            socket.emit('send-chat', { message: msg, recipientId });
             chatInput.value = '';
         }
     };
 
     socket.on('receive-chat', (data) => {
         const div = document.createElement('div');
-        div.innerHTML = `<strong style="color:var(--accent-color)">${data.user.name}:</strong> <span>${data.message}</span>`;
+        let prefix = `<strong style="color:var(--accent-color)">${data.user.name}</strong>`;
+        if (data.isPrivate) {
+            prefix += ` <em style="color: #8b949e; font-size: 0.8em;">(Direct)</em>`;
+        }
+        div.innerHTML = `${prefix}: <span>${data.message}</span>`;
         div.style.marginBottom = '0.5rem';
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;

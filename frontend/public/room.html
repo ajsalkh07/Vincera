@@ -15,7 +15,40 @@
 </head>
 
 <body class="room-body">
-    <div class="main-room-container">
+    <div id="preJoinLobby" class="pre-join-lobby">
+        <div class="lobby-content">
+            <div class="lobby-video-container">
+                <video id="lobbyVideoPreview" autoplay muted playsinline></video>
+                <div class="lobby-empty-avatar" style="display: none;">
+                    <svg viewBox="0 0 24 24" class="lucide lucide-user">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                </div>
+                <div class="lobby-controls">
+                    <button id="lobbyToggleMic" class="control-btn" title="Toggle Mic">
+                        <!-- Icon swapped by JS -->
+                    </button>
+                    <button id="lobbyToggleCam" class="control-btn" title="Toggle Cam">
+                        <!-- Icon swapped by JS -->
+                    </button>
+                </div>
+            </div>
+            <div class="lobby-info">
+                <h2>Ready to join?</h2>
+                <p id="lobbyParticipantInfo">Joining <span id="lobbyMeetingCode"
+                        style="font-weight: bold;">Loading...</span></p>
+                <div class="join-actions">
+                    <button id="btnJoinNow" class="btn-primary"
+                        style="font-size: 1.1rem; border-radius: 99px; margin-bottom: 1rem;">Join now</button>
+                    <button class="btn-secondary"
+                        style="border-radius: 99px; color: var(--accent-color); border-color: rgba(255,255,255,0.1);">Present</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainRoomContainer" class="main-room-container" style="display: none;">
         <div class="video-grid-container">
             <div class="meeting-header">
                 <div class="logo">VINCERA</div>
