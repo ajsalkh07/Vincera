@@ -38,11 +38,16 @@
                 <h2>Ready to join?</h2>
                 <p id="lobbyParticipantInfo">Joining <span id="lobbyMeetingCode"
                         style="font-weight: bold;">Loading...</span></p>
+                <div class="lobby-name-input-group" style="margin: 1.5rem 0; width: 100%;">
+                    <label for="lobbyNameInput"
+                        style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; opacity: 0.8;">Your
+                        Name</label>
+                    <input type="text" id="lobbyNameInput" placeholder="Enter your name"
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; font-size: 1rem;">
+                </div>
                 <div class="join-actions">
                     <button id="btnJoinNow" class="btn-primary"
                         style="font-size: 1.1rem; border-radius: 99px; margin-bottom: 1rem;">Join now</button>
-                    <button class="btn-secondary"
-                        style="border-radius: 99px; color: var(--accent-color); border-color: rgba(255,255,255,0.1);">Present</button>
                 </div>
             </div>
         </div>
@@ -165,15 +170,6 @@
             </div>
 
             <div id="participants" class="tab-content active">
-                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
-                    <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">Change Display Name</p>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="newNameInput" placeholder="New name..."
-                            style="margin-bottom: 0; padding: 0.5rem;">
-                        <button id="changeNameBtn" class="btn-primary"
-                            style="width: auto; padding: 0.5rem 1rem;">Update</button>
-                    </div>
-                </div>
                 <ul id="participantsList"></ul>
             </div>
 

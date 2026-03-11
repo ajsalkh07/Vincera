@@ -125,6 +125,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function startPreview() {
             try {
+                // Initialize name input from session
+                const lobbyNameInput = document.getElementById('lobbyNameInput');
+                if (lobbyNameInput) {
+                    lobbyNameInput.value = userSession.name || '';
+                }
+
                 localStream = await navigator.mediaDevices.getUserMedia({ video: isLobbyCamEnabled, audio: isLobbyMicEnabled });
                 lobbyVideo.srcObject = localStream;
                 emptyAvatar.style.display = 'none';
@@ -168,6 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         document.getElementById('btnJoinNow').onclick = () => {
+            const newName = document.getElementById('lobbyNameInput').value.trim();
+            if (newName) {
+                userSession.name = newName;
+                sessionStorage.setItem(getSessionKey(), JSON.stringify(userSession));
+                // Explicitly emit the name change to the server so everyone sees it
+                socket.emit('change-name', newName);
+            }
+
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
@@ -728,16 +742,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     });
 
-    // Name Change UI
-    document.getElementById('changeNameBtn').onclick = () => {
-        const newName = document.getElementById('newNameInput').value.trim();
-        if (newName && newName !== userSession.name) {
-            userSession.name = newName;
-            sessionStorage.setItem(getSessionKey(), JSON.stringify(userSession));
-            socket.emit('change-name', newName);
-            document.getElementById('newNameInput').value = '';
-        }
-    };
 
     // Polls
     if (createPollBtn) {
