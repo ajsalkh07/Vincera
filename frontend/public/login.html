@@ -66,6 +66,9 @@
 
         // Initialize Google Sign-In
         window.onload = function () {
+            if (typeof autoLogin === 'function') {
+                autoLogin();
+            }
             fetch('/api/config')
                 .then(res => res.json())
                 .then(config => {

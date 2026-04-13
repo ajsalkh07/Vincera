@@ -112,12 +112,29 @@ function checkAuth() {
     return true;
 }
 
+async function autoLogin() {
+    try {
+        const res = await fetch('/api/auth/verify');
+        const data = await res.json();
+        if (data.success) {
+            resetTabId();
+            sessionStorage.setItem(getSessionKey(), JSON.stringify(data.user));
+            window.location.href = '/dashboard';
+        }
+    } catch (err) {
+        console.error("Auto login check failed", err);
+    }
+}
+
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
+    logoutBtn.addEventListener('click', async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+        } catch (e) {
+            console.error('Logout error:', e);
+        }
         sessionStorage.removeItem(getSessionKey());
-        // Clear session cookie
-        document.cookie = "session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         window.location.href = '/';
     });
 }

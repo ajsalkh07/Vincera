@@ -20,6 +20,14 @@ const router = (req, res) => {
         serveFile(res, path.join(__dirname, '../frontend/public', 'room.html'), 'text/html');
     }
     // API Routes example
+    else if (req.method === 'GET' && pathname === '/api/auth/verify') {
+        const authController = require('./controllers/authController');
+        authController.verifySession(req, res);
+    }
+    else if (req.method === 'POST' && pathname === '/api/auth/logout') {
+        const authController = require('./controllers/authController');
+        authController.logout(req, res);
+    }
     else if (req.method === 'POST' && pathname === '/api/auth/google') {
         const authController = require('./controllers/authController');
         authController.googleLogin(req, res);
@@ -35,6 +43,10 @@ const router = (req, res) => {
     else if (req.method === 'POST' && pathname === '/api/meeting/create') {
         const meetingController = require('./controllers/meetingController');
         meetingController.createMeeting(req, res);
+    }
+    else if (req.method === 'POST' && pathname === '/api/meeting/validate') {
+        const meetingController = require('./controllers/meetingController');
+        meetingController.validateMeeting(req, res);
     }
     else if (req.method === 'POST' && pathname === '/api/livekit/token') {
         const livekitController = require('./controllers/livekitController');

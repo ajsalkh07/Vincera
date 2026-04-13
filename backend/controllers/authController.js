@@ -64,7 +64,7 @@ exports.googleLogin = async (req, res) => {
 
             res.writeHead(200, {
                 'Content-Type': 'application/json',
-                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
+                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
             });
             res.end(JSON.stringify({ success: true, user: sessionData }));
 
@@ -104,7 +104,7 @@ exports.register = async (req, res) => {
 
             res.writeHead(200, {
                 'Content-Type': 'application/json',
-                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
+                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
             });
             res.end(JSON.stringify({ success: true, user: sessionData }));
         } catch (error) {
@@ -138,7 +138,7 @@ exports.login = async (req, res) => {
 
             res.writeHead(200, {
                 'Content-Type': 'application/json',
-                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`
+                'Set-Cookie': `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
             });
             res.end(JSON.stringify({ success: true, user: sessionData }));
         } catch (error) {
@@ -146,4 +146,49 @@ exports.login = async (req, res) => {
             res.end(JSON.stringify({ success: false, error: error.message }));
         }
     });
+};
+
+exports.verifySession = async (req, res) => {
+    try {
+        const cookieHeader = req.headers.cookie;
+        if (!cookieHeader) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ success: false, error: 'No session cookie found' }));
+        }
+
+        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+            const [key, value] = cookie.trim().split('=');
+            acc[key] = value;
+            return acc;
+        }, {});
+
+        const sessionToken = cookies['session'];
+        if (!sessionToken) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ success: false, error: 'No session token found' }));
+        }
+
+        const sessionData = JSON.parse(Buffer.from(sessionToken, 'base64').toString('utf8'));
+        
+        // Ensure user actually still exists in DB
+        const user = await User.findById(sessionData.userId);
+        if (!user) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ success: false, error: 'Invalid user session' }));
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, user: sessionData }));
+    } catch (error) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Invalid session cookie' }));
+    }
+};
+
+exports.logout = (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
+    });
+    res.end(JSON.stringify({ success: true, message: 'Logged out successfully' }));
 };

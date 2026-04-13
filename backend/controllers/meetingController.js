@@ -43,3 +43,28 @@ exports.createMeeting = async (req, res) => {
         }
     });
 };
+
+exports.validateMeeting = async (req, res) => {
+    let body = '';
+    req.on('data', chunk => body += chunk.toString());
+    req.on('end', async () => {
+        try {
+            const { meetingId } = JSON.parse(body || '{}');
+            if (!meetingId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Meeting ID required' }));
+            }
+            const meeting = await Meeting.findOne({ meetingId });
+            if (!meeting) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Meeting not found' }));
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        } catch (error) {
+            console.error('Validate Meeting error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Server error' }));
+        }
+    });
+};

@@ -1,5 +1,6 @@
 const { RoomServiceClient, AccessToken } = require('livekit-server-sdk');
 const cookie = require('cookie');
+const Meeting = require('../models/Meeting');
 
 // Ensure Livekit credentials exist
 const livekitHost = (process.env.LIVEKIT_URL || 'ws://localhost:7880').trim();
@@ -56,9 +57,17 @@ exports.generateToken = async (req, res) => {
 
             // make sure the room exists
             try {
+                const meeting = await Meeting.findOne({ meetingId: roomName });
+                if (!meeting) {
+                    throw new Error('Meeting not found in database');
+                }
                 await roomService.createRoom({ name: roomName });
                 console.log('Room created/verified in LiveKit');
             } catch (e) {
+                if (e.message === 'Meeting not found in database') {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ success: false, error: 'Meeting not found' }));
+                }
                 if (!e.message || !e.message.includes('already exists')) {
                     console.warn('LiveKit Room Service warning:', e.message || e);
                     // Don't throw here, just warn. The token might still work if the host is reachable.

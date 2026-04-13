@@ -208,7 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (!data.success) {
-                alert(`Failed to get room token: ${data.error}`);
+                alert(`Failed to join room: ${data.error}`);
+                window.location.href = '/dashboard';
                 return;
             }
 

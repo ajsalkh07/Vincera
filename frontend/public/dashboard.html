@@ -50,9 +50,23 @@
                 if (data.success) window.location.href = `/room/${data.meetingId}`;
             };
 
-            document.getElementById('joinMeetingBtn').onclick = () => {
+            document.getElementById('joinMeetingBtn').onclick = async () => {
                 const code = document.getElementById('meetingCodeInput').value.trim();
-                if (code) window.location.href = `/room/${code}`;
+                if (!code) {
+                    alert('Please enter a meeting code');
+                    return;
+                }
+                const response = await fetch('/api/meeting/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId: code })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = `/room/${code}`;
+                } else {
+                    alert('Invalid meeting code. Meeting not found.');
+                }
             };
         });
     </script>
