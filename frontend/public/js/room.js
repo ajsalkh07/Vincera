@@ -62,6 +62,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    if (hostDropdownLockBtn) {
+        hostDropdownLockBtn.onclick = () => {
+            const toggleBtn = document.getElementById('toggleLockMeeting');
+            if (toggleBtn) toggleBtn.click();
+        };
+    }
+
     const roomName = decodeURIComponent(window.location.pathname.split('/').pop());
 
     const meetingCodeEl = document.getElementById('meetingCode');
