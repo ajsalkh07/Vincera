@@ -147,15 +147,7 @@ module.exports = (io) => {
                 io.to(roomId).emit('lock-status-updated', { isLocked });
             });
 
-            socket.on('request-to-join', (requestData) => {
-                // requestData should have { userId, name, picture }
-                // Find host
-                const host = rooms[roomId]?.participants.find(p => p.userId === rooms[roomId].hostId);
-                if (host && host.socketId) {
-                    io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
-                }
-            });
-
+            // Request to join logic moved outside join-room
             socket.on('join-response', ({ targetSocketId, allowed }) => {
                 if (rooms[roomId].hostId !== user.userId) return;
                 io.to(targetSocketId).emit('join-response', { allowed });
@@ -207,6 +199,14 @@ module.exports = (io) => {
                 }
                 socket.to(roomId).emit('user-disconnected', user);
             });
+        });
+
+        socket.on('request-to-join', (requestData) => {
+            const { roomId } = requestData;
+            const host = rooms[roomId]?.participants.find(p => p.userId === rooms[roomId].hostId);
+            if (host && host.socketId) {
+                io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
+            }
         });
     });
 };

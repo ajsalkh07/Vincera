@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 initPreJoin();
-                socket.emit('join-room', roomName, userSession);
+
             } else {
                 alert('Meeting not found');
                 window.location.href = '/dashboard';
@@ -261,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         requestStatus.textContent = 'Request sent, waiting for host...';
         btnRequestJoin.disabled = true;
         socket.emit('request-to-join', {
+            roomId: roomName,
             userId: userSession.userId,
             name: userSession.name,
             picture: userSession.picture
@@ -281,8 +282,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (statusEl) statusEl.style.display = 'none';
                 document.getElementById('preJoinLobby').style.display = 'none';
                 document.getElementById('mainRoomContainer').style.display = 'flex';
+                socket.emit('join-room', roomName, userSession);
                 joinRoom();
             }, 1500);
+
         } else {
             if (statusEl) statusEl.textContent = 'Request denied by host.';
             if (joinBtn) joinBtn.disabled = false;
@@ -556,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusEl.textContent = 'Request sent, waiting for host...';
                 
                 socket.emit('request-to-join', {
+                    roomId: roomName,
                     userId: userSession.userId,
                     name: userSession.name,
                     picture: userSession.picture
@@ -568,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.getElementById('preJoinLobby').style.display = 'none';
             document.getElementById('mainRoomContainer').style.display = 'flex';
+            socket.emit('join-room', roomName, userSession);
             joinRoom();
         };
 
