@@ -14,16 +14,143 @@ document.addEventListener('DOMContentLoaded', () => {
 
             btn.classList.add('active');
             document.getElementById(btn.dataset.target).classList.add('active');
+            
+            // Show sidebar if it's hidden (in case we add a toggle)
+            document.querySelector('.sidebar').classList.add('active');
         });
     });
 
-    const roomName = window.location.pathname.split('/').pop();
+    // Sidebar Close Logic
+    const closeSidebarBtn = document.querySelector('.close-sidebar-btn');
+    if (closeSidebarBtn) {
+        closeSidebarBtn.onclick = () => {
+            document.querySelector('.sidebar').classList.remove('active');
+            tabBtns.forEach(b => b.classList.remove('active'));
+        };
+    }
+
+    // Add People Button Logic
+    const addPeopleBtn = document.getElementById('addPeopleBtn');
+    if (addPeopleBtn) {
+        addPeopleBtn.onclick = () => {
+            const copyBtn = document.getElementById('copyMeetingCode');
+            if (copyBtn) copyBtn.click(); // Trigger the existing copy logic
+        };
+    }
+
+    // Host Settings Dropdown Logic - Replaced by Host Controls Tab
+    const allowScreenShareToggle = document.getElementById('allowScreenShareAll');
+    const allowWhiteboardToggle = document.getElementById('allowWhiteboardAll');
+    const hostDropdownLockBtn = document.getElementById('hostDropdownLockBtn');
+
+    if (allowScreenShareToggle) {
+        allowScreenShareToggle.onchange = (e) => {
+            socket.emit('toggle-screen-share-permission', e.target.checked);
+        };
+    }
+
+    if (allowWhiteboardToggle) {
+        allowWhiteboardToggle.onchange = (e) => {
+            socket.emit('toggle-whiteboard-permission', e.target.checked);
+        };
+    }
+
+    if (hostDropdownLockBtn) {
+        hostDropdownLockBtn.onclick = () => {
+            const toggleBtn = document.getElementById('toggleLockMeeting');
+            if (toggleBtn) toggleBtn.click();
+        };
+    }
+
+    const roomName = decodeURIComponent(window.location.pathname.split('/').pop());
+
     const meetingCodeEl = document.getElementById('meetingCode');
     const participantsList = document.getElementById('participantsList');
+    const hostControlsTabBtn = document.getElementById('hostControlsTabBtn');
     const chatMessages = document.getElementById('chatMessages');
     const activePollsContainer = document.getElementById('activePolls');
     const createPollBtn = document.getElementById('createPollBtn');
     const chatInput = document.getElementById('chatInput');
+    const toggleLockBtn = document.getElementById('toggleLockMeeting');
+    const lockIcon = document.getElementById('lockIcon');
+    const joinRequestsContainer = document.getElementById('joinRequestsContainer');
+    const requestToJoinModal = document.getElementById('requestToJoinModal');
+    const btnRequestJoin = document.getElementById('btnRequestJoin');
+    const requestStatus = document.getElementById('requestStatus');
+    const muteAllBtn = document.getElementById('muteAllBtn');
+    if (muteAllBtn) {
+        muteAllBtn.onclick = () => {
+            if (confirm('Mute all participants?')) {
+                socket.emit('remote-mute-all');
+            }
+        };
+    }
+    const hostControls = document.getElementById('hostControls');
+
+    function formatMeetingCode(code) {
+        if (!code || code.length !== 9) return code;
+        return `${code.substr(0, 3)}-${code.substr(3, 3)}-${code.substr(6, 3)}`;
+    }
+
+    // Bottom Bar Sidebar Toggles
+    const toggleParticipantsBtn = document.getElementById('toggleParticipants');
+    const toggleChatBtn = document.getElementById('toggleChat');
+    const sidebar = document.querySelector('.sidebar');
+
+    function openSidebarTab(target) {
+        sidebar.classList.add('active');
+        tabBtns.forEach(b => {
+            if (b.dataset.target === target) {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
+        tabContents.forEach(c => {
+            if (c.id === target) {
+                c.classList.add('active');
+            } else {
+                c.classList.remove('active');
+            }
+        });
+    }
+
+    if (toggleParticipantsBtn) {
+        toggleParticipantsBtn.onclick = () => {
+            if (sidebar.classList.contains('active') && document.getElementById('participants').classList.contains('active')) {
+                sidebar.classList.remove('active');
+            } else {
+                openSidebarTab('participants');
+            }
+        };
+    }
+
+    if (toggleChatBtn) {
+        toggleChatBtn.onclick = () => {
+            if (sidebar.classList.contains('active') && document.getElementById('chat').classList.contains('active')) {
+                sidebar.classList.remove('active');
+            } else {
+                openSidebarTab('chat');
+            }
+        };
+    }
+
+    if (meetingCodeEl) meetingCodeEl.textContent = formatMeetingCode(roomName);
+    const lobbyMeetingCode = document.getElementById('lobbyMeetingCode');
+    if (lobbyMeetingCode) lobbyMeetingCode.textContent = formatMeetingCode(roomName);
+
+    // Copy meeting code
+    const copyBtn = document.getElementById('copyMeetingCode');
+    if (copyBtn) {
+        copyBtn.onclick = () => {
+            const formattedCode = formatMeetingCode(roomName);
+            navigator.clipboard.writeText(formattedCode).then(() => {
+                const originalHTML = copyBtn.innerHTML;
+                copyBtn.innerHTML = ICONS.check;
+                setTimeout(() => copyBtn.innerHTML = originalHTML, 2000);
+            });
+        };
+    }
 
     // SVG Constants
     const ICONS = {
@@ -34,28 +161,233 @@ document.addEventListener('DOMContentLoaded', () => {
         hand: `<svg viewBox="0 0 24 24" class="lucide lucide-hand"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M18 8a2 2 0 0 1 2 2v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-1.3-6.6-4.4L2 13.6a2 2 0 0 1 0-2.8v0a2 2 0 0 1 2.8 0l2.2 2.2"/></svg>`,
         copy: `<svg viewBox="0 0 24 24" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
         check: `<svg viewBox="0 0 24 24" class="lucide lucide-check"><polyline points="20 6 9 17 4 12"/></svg>`,
-        host: `<svg viewBox="0 0 24 24" class="lucide lucide-shield" style="width: 14px; height: 14px; margin-right: 4px; display: inline; vertical-align: text-bottom;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`
+        host: `<svg viewBox="0 0 24 24" class="lucide lucide-shield" style="width: 14px; height: 14px; margin-right: 4px; display: inline; vertical-align: text-bottom;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+        lock: `<svg viewBox="0 0 24 24" class="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+        unlock: `<svg viewBox="0 0 24 24" class="lucide lucide-unlock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
+        kick: `<svg viewBox="0 0 24 24" class="lucide lucide-user-x"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="18" x2="22" y1="8" y2="12"/><line x1="22" x2="18" y1="8" y2="12"/></svg>`
     };
 
-    if (meetingCodeEl) meetingCodeEl.textContent = roomName;
+    let isMeetingLocked = false;
+    let hostId = null;
+    let userSession = JSON.parse(sessionStorage.getItem(getSessionKey())) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
+    const socket = io();
 
-    // Copy Meeting Code
-    const copyBtn = document.getElementById('copyMeetingCode');
-    if (copyBtn) {
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(roomName).then(() => {
-                const originalHTML = copyBtn.innerHTML;
-                copyBtn.innerHTML = ICONS.check;
-                setTimeout(() => copyBtn.innerHTML = originalHTML, 2000);
-            }).catch(err => {
-                console.error('Failed to copy code:', err);
+    // Check Meeting Status
+    async function checkMeetingStatus() {
+        try {
+            const res = await fetch('/api/meeting/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId: roomName })
             });
-        };
+            const data = await res.json();
+            if (data.success) {
+                isMeetingLocked = data.isLocked;
+                hostId = data.hostId;
+                
+                const isHost = userSession.userId === hostId;
+                if (isHost) {
+                    toggleLockBtn.style.display = 'flex';
+                    hostControlsTabBtn.style.display = 'block';
+                    document.getElementById('hostLobbyControls').style.display = 'block';
+                    updateLockIcon(isMeetingLocked);
+                }
+
+                if (isMeetingLocked && !isHost) {
+                    const joinBtn = document.getElementById('btnJoinNow');
+                    joinBtn.textContent = 'Request to Join';
+                    joinBtn.classList.add('requesting');
+                    console.log('Meeting is locked, user must request join');
+                }
+                
+                initPreJoin();
+                socket.emit('join-room', roomName, userSession);
+            } else {
+                alert('Meeting not found');
+                window.location.href = '/dashboard';
+            }
+        } catch (e) {
+            console.error('Error checking meeting status:', e);
+        }
     }
 
+    function updateLockIcon(locked) {
+        lockIcon.innerHTML = locked ? ICONS.lock : ICONS.unlock;
+        toggleLockBtn.title = locked ? 'Unlock Meeting' : 'Lock Meeting';
+        
+        if (hostDropdownLockBtn) {
+            hostDropdownLockBtn.innerHTML = locked ? 
+                `${ICONS.unlock} Unlock Meeting` : 
+                `${ICONS.lock} Lock Meeting`;
+        }
+
+        const lobbyLockIcon = document.getElementById('lobbyLockIcon');
+        if (lobbyLockIcon) {
+            lobbyLockIcon.innerHTML = locked ? ICONS.lock : ICONS.unlock;
+        }
+    }
+
+    const toggleLockHandler = async () => {
+        const newState = !isMeetingLocked;
+        try {
+            const res = await fetch('/api/meeting/toggle-lock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId: roomName, isLocked: newState })
+            });
+            const data = await res.json();
+            if (data.success) {
+                isMeetingLocked = newState;
+                updateLockIcon(isMeetingLocked);
+                socket.emit('toggle-lock', isMeetingLocked);
+            }
+        } catch (e) {
+            console.error('Error toggling lock:', e);
+        }
+    };
+
+    toggleLockBtn.onclick = toggleLockHandler;
+    const lobbyToggleLock = document.getElementById('lobbyToggleLock');
+    if (lobbyToggleLock) lobbyToggleLock.onclick = toggleLockHandler;
+
+    btnRequestJoin.onclick = () => {
+        requestStatus.textContent = 'Request sent, waiting for host...';
+        btnRequestJoin.disabled = true;
+        socket.emit('request-to-join', {
+            userId: userSession.userId,
+            name: userSession.name,
+            picture: userSession.picture
+        });
+    };
+
+    document.getElementById('btnBackToDashboard').onclick = () => {
+        window.location.href = '/dashboard';
+    };
+
+    socket.on('join-response', ({ allowed }) => {
+        const statusEl = document.getElementById('lobbyRequestStatus');
+        const joinBtn = document.getElementById('btnJoinNow');
+        
+        if (allowed) {
+            if (statusEl) statusEl.textContent = 'Approved! Joining...';
+            setTimeout(() => {
+                if (statusEl) statusEl.style.display = 'none';
+                document.getElementById('preJoinLobby').style.display = 'none';
+                document.getElementById('mainRoomContainer').style.display = 'flex';
+                joinRoom();
+            }, 1500);
+        } else {
+            if (statusEl) statusEl.textContent = 'Request denied by host.';
+            if (joinBtn) joinBtn.disabled = false;
+        }
+    });
+
+    socket.on('join-request', (data) => {
+        // 1. Popup Notification
+        const requestDiv = document.createElement('div');
+        requestDiv.className = 'glass-card';
+        requestDiv.style.pointerEvents = 'auto';
+        requestDiv.style.padding = '15px';
+        requestDiv.style.width = '300px';
+        requestDiv.style.border = '1px solid var(--accent-color)';
+        requestDiv.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 10px;">Join Request</div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <img src="${data.picture || 'https://ui-avatars.com/api/?name=' + data.name}" style="width: 40px; height: 40px; border-radius: 50%;">
+                <span>${data.name} wants to join</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-primary approve-btn" style="flex: 1; padding: 5px;">Allow</button>
+                <button class="btn-secondary deny-btn" style="flex: 1; padding: 5px;">Deny</button>
+            </div>
+        `;
+        joinRequestsContainer.appendChild(requestDiv);
+
+        // 2. Sidebar List Item
+        const sidebarReqList = document.getElementById('pendingRequestsList');
+        const sidebarReqItems = document.getElementById('requestsItems');
+        if (sidebarReqList) sidebarReqList.style.display = 'block';
+        
+        const sidebarItem = document.createElement('div');
+        sidebarItem.className = 'glass-card';
+        sidebarItem.style.padding = '8px';
+        sidebarItem.style.fontSize = '0.85rem';
+        sidebarItem.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span>${data.name}</span>
+                <div style="display: flex; gap: 4px;">
+                    <button class="approve-btn control-btn" style="width: 24px; height: 24px; padding: 4px;">${ICONS.check}</button>
+                    <button class="deny-btn control-btn danger" style="width: 24px; height: 24px; padding: 4px;">X</button>
+                </div>
+            </div>
+        `;
+        sidebarReqItems.appendChild(sidebarItem);
+
+        const handleResponse = (allowed) => {
+            socket.emit('join-response', { targetSocketId: data.socketId, allowed });
+            requestDiv.remove();
+            sidebarItem.remove();
+            if (sidebarReqItems.children.length === 0) sidebarReqList.style.display = 'none';
+        };
+
+        requestDiv.querySelector('.approve-btn').onclick = () => handleResponse(true);
+        requestDiv.querySelector('.deny-btn').onclick = () => handleResponse(false);
+        sidebarItem.querySelector('.approve-btn').onclick = () => handleResponse(true);
+        sidebarItem.querySelector('.deny-btn').onclick = () => handleResponse(false);
+    });
+
+    socket.on('kicked', () => {
+        alert('You have been removed from the meeting by the host.');
+        window.location.href = '/dashboard';
+    });
+
+    socket.on('user-kicked', ({ userId, name }) => {
+        addSystemMessage(`${name} was removed from the meeting`);
+        const el = document.getElementById(`user-list-${userId}`);
+        if (el) el.remove();
+    });
+
+    socket.on('lock-status-updated', ({ isLocked }) => {
+        isMeetingLocked = isLocked;
+        if (userSession.userId === hostId) {
+            updateLockIcon(isLocked);
+        }
+    });
+
+    muteAllBtn.onclick = () => {
+        if (confirm('Are you sure you want to mute everyone?')) {
+            socket.emit('mute-all');
+        }
+    };
+
+    socket.on('remote-mute-request', ({ targetUserId, all }) => {
+        if (all || targetUserId === userSession.userId) {
+            if (userSession.userId === hostId && all) return; // Don't mute host if 'mute all'
+            
+            room.localParticipant.setMicrophoneEnabled(false);
+            const micBtn = document.getElementById('toggleMic');
+            micBtn.classList.add('active');
+            micBtn.innerHTML = ICONS.micOff;
+            updateMuteUI(userSession.userId, true);
+            
+            // Notification
+            const toast = document.createElement('div');
+            toast.className = 'glass-card';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '100px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.padding = '10px 20px';
+            toast.style.zIndex = '5000';
+            toast.textContent = 'The host has muted your microphone.';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    });
+
     // Socket.io and Session Initialization
-    const socket = io();
-    const userSession = JSON.parse(sessionStorage.getItem(getSessionKey())) || { name: 'Anonymous', userId: 'temp_' + Math.random() };
+    // (Already initialized above)
+
 
     const zoomOverlay = document.getElementById('zoom-overlay');
     if (zoomOverlay) {
@@ -88,7 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let room;
-    let hostId = null;
     let votedPolls = new Set();
     let isScreenShareAllowed = false;
     let isWhiteboardOpen = false;
@@ -114,12 +445,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Pre-join Lobby
     async function initPreJoin() {
+        console.log('initPreJoin called');
         const lobbyVideo = document.getElementById('lobbyVideoPreview');
         const emptyAvatar = document.querySelector('.lobby-empty-avatar');
         const lobbyMicBtn = document.getElementById('lobbyToggleMic');
         const lobbyCamBtn = document.getElementById('lobbyToggleCam');
         document.getElementById('lobbyMeetingCode').textContent = roomName;
 
+        lobbyMicBtn.innerHTML = ICONS.mic;
+        lobbyCamBtn.innerHTML = ICONS.video;
+        lobbyMicBtn.classList.add('active');
+        lobbyCamBtn.classList.add('active');
         lobbyMicBtn.innerHTML = ICONS.mic;
         lobbyCamBtn.innerHTML = ICONS.video;
 
@@ -135,14 +471,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 lobbyVideo.srcObject = localStream;
                 emptyAvatar.style.display = 'none';
                 lobbyVideo.style.display = 'block';
+
+                const lobbyAvatar = document.getElementById('lobbyInitialsAvatar');
+                if (lobbyAvatar) lobbyAvatar.style.display = 'none';
             } catch (err) {
                 console.error("Error accessing media devices.", err);
                 emptyAvatar.style.display = 'flex';
                 lobbyVideo.style.display = 'none';
                 isLobbyCamEnabled = false;
                 isLobbyMicEnabled = false;
-                lobbyMicBtn.classList.add('active');
-                lobbyCamBtn.classList.add('active');
+                
+                const lobbyAvatar = document.getElementById('lobbyInitialsAvatar');
+                if (lobbyAvatar) lobbyAvatar.style.display = 'none';
+
+                lobbyMicBtn.classList.add('off');
+                lobbyCamBtn.classList.add('off');
                 lobbyMicBtn.innerHTML = ICONS.micOff;
                 lobbyCamBtn.innerHTML = ICONS.videoOff;
             }
@@ -150,8 +493,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lobbyMicBtn.onclick = () => {
             isLobbyMicEnabled = !isLobbyMicEnabled;
-            lobbyMicBtn.classList.toggle('active', !isLobbyMicEnabled);
-            lobbyMicBtn.innerHTML = !isLobbyMicEnabled ? ICONS.micOff : ICONS.mic;
+            lobbyMicBtn.classList.toggle('on', isLobbyMicEnabled);
+            lobbyMicBtn.classList.toggle('off', !isLobbyMicEnabled);
+            lobbyMicBtn.innerHTML = isLobbyMicEnabled ? ICONS.mic : ICONS.micOff;
+            lobbyMicBtn.title = isLobbyMicEnabled ? 'Mute' : 'Unmute';
             if (localStream && localStream.getAudioTracks().length > 0) {
                 localStream.getAudioTracks()[0].enabled = isLobbyMicEnabled;
             }
@@ -159,8 +504,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lobbyCamBtn.onclick = async () => {
             isLobbyCamEnabled = !isLobbyCamEnabled;
-            lobbyCamBtn.classList.toggle('active', !isLobbyCamEnabled);
-            lobbyCamBtn.innerHTML = !isLobbyCamEnabled ? ICONS.videoOff : ICONS.video;
+            lobbyCamBtn.classList.toggle('on', isLobbyCamEnabled);
+            lobbyCamBtn.classList.toggle('off', !isLobbyCamEnabled);
+            lobbyCamBtn.innerHTML = isLobbyCamEnabled ? ICONS.video : ICONS.videoOff;
+            lobbyCamBtn.title = isLobbyCamEnabled ? 'Stop Video' : 'Start Video';
 
             if (isLobbyCamEnabled) {
                 await startPreview();
@@ -168,7 +515,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (localStream && localStream.getVideoTracks().length > 0) {
                     localStream.getVideoTracks().forEach(t => t.stop());
                 }
-                emptyAvatar.style.display = 'flex';
+                
+                // Show initials avatar in lobby
+                let lobbyAvatar = document.getElementById('lobbyInitialsAvatar');
+                if (!lobbyAvatar) {
+                    lobbyAvatar = createAvatarElement(userSession);
+                    lobbyAvatar.id = 'lobbyInitialsAvatar';
+                    document.querySelector('.lobby-video-container').appendChild(lobbyAvatar);
+                }
+                lobbyAvatar.style.display = 'flex';
+                lobbyAvatar.style.opacity = '1';
+                lobbyAvatar.style.transform = 'scale(1)';
+                
+                emptyAvatar.style.display = 'none'; // Hide the default SVG
                 lobbyVideo.style.display = 'none';
             }
         };
@@ -178,8 +537,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (newName) {
                 userSession.name = newName;
                 sessionStorage.setItem(getSessionKey(), JSON.stringify(userSession));
-                // Explicitly emit the name change to the server so everyone sees it
                 socket.emit('change-name', newName);
+            }
+
+            const isHost = userSession.userId === hostId;
+            if (isMeetingLocked && !isHost) {
+                const joinBtn = document.getElementById('btnJoinNow');
+                const statusEl = document.getElementById('lobbyRequestStatus');
+                joinBtn.disabled = true;
+                statusEl.style.display = 'block';
+                statusEl.textContent = 'Request sent, waiting for host...';
+                
+                socket.emit('request-to-join', {
+                    userId: userSession.userId,
+                    name: userSession.name,
+                    picture: userSession.picture
+                });
+                return;
             }
 
             if (localStream) {
@@ -191,6 +565,29 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         await startPreview();
+    }
+
+    function createAvatarElement(user) {
+        const container = document.createElement('div');
+        container.className = 'avatar-container';
+        container.id = `avatar-${user.userId || user.identity}`;
+        
+        const circle = document.createElement('div');
+        circle.className = 'avatar-circle';
+        
+        const name = user.name || 'Anonymous';
+        if (user.picture) {
+            circle.style.backgroundImage = `url(${user.picture})`;
+        } else {
+            const initials = name.split(' ').map(n => n[0]).join('').substr(0, 2).toUpperCase();
+            circle.textContent = initials || '?';
+            const colors = ['#2ea043', '#58a6ff', '#8b949e', '#f85149', '#d29922'];
+            const charCodeSum = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+            circle.style.backgroundColor = colors[charCodeSum % colors.length];
+        }
+        
+        container.appendChild(circle);
+        return container;
     }
 
     // Initialize LiveKit Room
@@ -217,25 +614,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
             room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
                 if (track.kind === LivekitClient.Track.Kind.Video) {
+                    let wrapper = document.getElementById(`wrapper-${participant.identity}`);
+                    if (!wrapper) {
+                        wrapper = document.createElement('div');
+                        wrapper.id = `wrapper-${participant.identity}`;
+                        wrapper.className = 'video-wrapper';
+
+                        const avatar = createAvatarElement({ userId: participant.identity, name: participant.name });
+                        wrapper.appendChild(avatar);
+
+                        const netIndicator = document.createElement('div');
+                        netIndicator.className = 'network-indicator';
+                        netIndicator.id = `net-${participant.identity}`;
+                        netIndicator.innerHTML = `
+                            <div class="network-bar"></div>
+                            <div class="network-bar"></div>
+                            <div class="network-bar"></div>
+                            <div class="network-bar"></div>
+                        `;
+                        netIndicator.title = 'Excellent connection';
+                        wrapper.appendChild(netIndicator);
+
+                        const nameLabel = document.createElement('div');
+                        nameLabel.className = 'participant-label';
+                        nameLabel.id = `label-${participant.identity}`;
+                        updateParticipantLabel(nameLabel, participant.name, participant.identity === hostId);
+                        wrapper.appendChild(nameLabel);
+
+                        document.getElementById('video-grid').appendChild(wrapper);
+                        setupZoom(wrapper);
+                    }
+                    
+                    const existingVid = wrapper.querySelector('video');
+                    if (existingVid) existingVid.remove();
+                    
                     const element = track.attach();
-                    const wrapper = document.createElement('div');
-                    wrapper.id = `wrapper-${participant.identity}`;
-                    wrapper.className = 'video-wrapper';
-
-                    const nameLabel = document.createElement('div');
-                    nameLabel.className = 'participant-label';
-                    nameLabel.id = `label-${participant.identity}`;
-                    updateParticipantLabel(nameLabel, participant.name || participant.identity, participant.identity === hostId);
-
-                    wrapper.appendChild(element);
-                    wrapper.appendChild(nameLabel);
-                    document.getElementById('video-grid').appendChild(wrapper);
-                    setupZoom(wrapper);
-
-                    // Check if already muted
+                    wrapper.appendChild(element); // Video attached to wrapper, now behind label
+                    
+                    // Check if already muted or video off
                     const audioPub = participant.getTrackPublication(LivekitClient.Track.Source.Microphone);
-                    if (audioPub && audioPub.isMuted) {
-                        updateMuteUI(participant.identity, true);
+                    if (audioPub && audioPub.isMuted) updateMuteUI(participant.identity, true);
+                    
+                    const videoPub = participant.getTrackPublication(LivekitClient.Track.Source.Camera);
+                    if (videoPub && videoPub.isMuted) {
+                        wrapper.classList.add('camera-off');
                     }
                 } else if (track.kind === LivekitClient.Track.Kind.Audio) {
                     document.body.appendChild(track.attach());
@@ -245,13 +667,23 @@ document.addEventListener('DOMContentLoaded', () => {
             room.on(LivekitClient.RoomEvent.TrackMuted, (publication, participant) => {
                 if (publication.kind === LivekitClient.Track.Kind.Audio) {
                     updateMuteUI(participant.identity, true);
+                } else if (publication.kind === LivekitClient.Track.Kind.Camera) {
+                    const wrapper = document.getElementById(`wrapper-${participant.identity}`);
+                    if (wrapper) wrapper.classList.add('camera-off');
                 }
             });
 
             room.on(LivekitClient.RoomEvent.TrackUnmuted, (publication, participant) => {
                 if (publication.kind === LivekitClient.Track.Kind.Audio) {
                     updateMuteUI(participant.identity, false);
+                } else if (publication.kind === LivekitClient.Track.Kind.Camera) {
+                    const wrapper = document.getElementById(`wrapper-${participant.identity}`);
+                    if (wrapper) wrapper.classList.remove('camera-off');
                 }
+            });
+
+            room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+                updateNetworkIndicator(participant.identity, quality);
             });
 
             room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
@@ -287,28 +719,55 @@ document.addEventListener('DOMContentLoaded', () => {
             const mainMicBtn = document.getElementById('toggleMic');
             const mainCamBtn = document.getElementById('toggleVideo');
 
-            mainMicBtn.classList.toggle('active', !isLobbyMicEnabled);
-            mainMicBtn.innerHTML = !isLobbyMicEnabled ? ICONS.micOff : ICONS.mic;
+            mainMicBtn.classList.toggle('on', isLobbyMicEnabled);
+            mainMicBtn.classList.toggle('off', !isLobbyMicEnabled);
+            mainMicBtn.innerHTML = isLobbyMicEnabled ? ICONS.mic : ICONS.micOff;
+            mainMicBtn.title = isLobbyMicEnabled ? 'Mute' : 'Unmute';
 
-            mainCamBtn.classList.toggle('active', !isLobbyCamEnabled);
-            mainCamBtn.innerHTML = !isLobbyCamEnabled ? ICONS.videoOff : ICONS.video;
+            mainCamBtn.classList.toggle('on', isLobbyCamEnabled);
+            mainCamBtn.classList.toggle('off', !isLobbyCamEnabled);
+            mainCamBtn.innerHTML = isLobbyCamEnabled ? ICONS.video : ICONS.videoOff;
+            mainCamBtn.title = isLobbyCamEnabled ? 'Stop Video' : 'Start Video';
 
-            // Local Video
+            // Local Wrapper and Video/Avatar
+            let wrapper = document.getElementById(`wrapper-${userSession.userId}`);
+            if (!wrapper) {
+                wrapper = document.createElement('div');
+                wrapper.id = `wrapper-${userSession.userId}`;
+                wrapper.className = 'video-wrapper';
+                if (!isLobbyCamEnabled) wrapper.classList.add('camera-off');
+
+                const avatar = createAvatarElement(userSession);
+                wrapper.appendChild(avatar);
+
+                const netIndicator = document.createElement('div');
+                netIndicator.className = 'network-indicator';
+                netIndicator.id = `net-${userSession.userId}`;
+                netIndicator.innerHTML = `
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                `;
+                netIndicator.title = 'Excellent connection';
+                wrapper.appendChild(netIndicator);
+                updateNetworkIndicator(userSession.userId, room.localParticipant.connectionQuality);
+
+                const nameLabel = document.createElement('div');
+                nameLabel.className = 'participant-label';
+                nameLabel.id = `label-${userSession.userId}`;
+                updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
+                wrapper.appendChild(nameLabel);
+                
+                document.getElementById('video-grid').appendChild(wrapper);
+                setupZoom(wrapper);
+            }
+
             if (isLobbyCamEnabled) {
                 const localVideoTrack = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
                 if (localVideoTrack && localVideoTrack.videoTrack) {
                     const element = localVideoTrack.videoTrack.attach();
-                    const wrapper = document.createElement('div');
-                    wrapper.id = `wrapper-${userSession.userId}`;
-                    wrapper.className = 'video-wrapper';
-                    const nameLabel = document.createElement('div');
-                    nameLabel.className = 'participant-label';
-                    nameLabel.id = `label-${userSession.userId}`;
-                    updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
-                    wrapper.appendChild(element);
-                    wrapper.appendChild(nameLabel);
-                    document.getElementById('video-grid').appendChild(wrapper);
-                    setupZoom(wrapper);
+                    wrapper.insertBefore(element, wrapper.firstChild);
                 }
             }
 
@@ -323,9 +782,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     await room.localParticipant.setMicrophoneEnabled(!enabled);
                     const btn = document.getElementById('toggleMic');
-                    btn.classList.toggle('active', enabled);
-                    btn.innerHTML = enabled ? ICONS.micOff : ICONS.mic;
-                    updateMuteUI(userSession.userId, enabled); // Instantly show for self
+                    btn.classList.toggle('off', enabled);
+                    btn.classList.toggle('on', !enabled);
+                    btn.innerHTML = !enabled ? ICONS.mic : ICONS.micOff;
+                    btn.title = !enabled ? 'Mute' : 'Unmute';
+                    updateMuteUI(userSession.userId, enabled);
                 } catch (err) {
                     console.error('Error toggling mic:', err);
                 }
@@ -335,49 +796,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     await room.localParticipant.setCameraEnabled(!enabled);
                     const btn = document.getElementById('toggleVideo');
-                    btn.classList.toggle('active', enabled);
-                    btn.innerHTML = enabled ? ICONS.videoOff : ICONS.video;
+                    btn.classList.toggle('off', enabled);
+                    btn.classList.toggle('on', !enabled);
+                    btn.innerHTML = !enabled ? ICONS.video : ICONS.videoOff;
+                    btn.title = !enabled ? 'Stop Video' : 'Start Video';
 
                     let wrapper = document.getElementById(`wrapper-${userSession.userId}`);
-
-                    if (!enabled) { // Turned camera ON
-                        if (!wrapper) {
-                            wrapper = document.createElement('div');
-                            wrapper.id = `wrapper-${userSession.userId}`;
-                            wrapper.className = 'video-wrapper';
-                            const nameLabel = document.createElement('div');
-                            nameLabel.className = 'participant-label';
-                            nameLabel.id = `label-${userSession.userId}`;
-                            updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
-                            wrapper.appendChild(nameLabel);
-                            document.getElementById('video-grid').appendChild(wrapper);
-                            setupZoom(wrapper);
-
-                            // Restore UI state
-                            if (!room.localParticipant.isMicrophoneEnabled) {
-                                updateMuteUI(userSession.userId, true);
-                            }
-                            if (isHandRaised) {
-                                updateHandUI(userSession.userId, true);
+                    if (wrapper) {
+                        wrapper.classList.toggle('camera-off', enabled);
+                        if (!enabled) { // Turned camera ON
+                            const pub = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
+                            if (pub && pub.videoTrack) {
+                                const existingVid = wrapper.querySelector('video');
+                                if (existingVid) existingVid.remove();
+                                const element = pub.videoTrack.attach();
+                                wrapper.appendChild(element); // Ensure it's behind label
                             }
                         }
+                    } else {
+                        // If wrapper didn't exist (camera was off), create it
+                        wrapper = document.createElement('div');
+                        wrapper.id = `wrapper-${userSession.userId}`;
+                        wrapper.className = 'video-wrapper';
+                        
+                        const avatar = createAvatarElement(userSession);
+                        wrapper.appendChild(avatar);
 
+                        const nameLabel = document.createElement('div');
+                        nameLabel.className = 'participant-label';
+                        nameLabel.id = `label-${userSession.userId}`;
+                        updateParticipantLabel(nameLabel, userSession.name + ' (You)', userSession.userId === hostId);
+                        
                         const pub = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
                         if (pub && pub.videoTrack) {
-                            const existingVid = wrapper.querySelector('video');
-                            if (existingVid) existingVid.remove();
                             const element = pub.videoTrack.attach();
-                            wrapper.insertBefore(element, wrapper.firstChild);
-
-                            if (backgroundProcessor) {
-                                try { await pub.videoTrack.setProcessor(backgroundProcessor); }
-                                catch (e) { console.error("Could not reapply effect", e); }
-                            }
+                            wrapper.appendChild(element);
                         }
-                    } else { // Turned camera OFF
-                        if (wrapper) {
-                            wrapper.remove();
-                        }
+                        
+                        wrapper.appendChild(nameLabel);
+                        document.getElementById('video-grid').appendChild(wrapper);
+                        setupZoom(wrapper);
                     }
                 } catch (err) {
                     console.error('Error toggling video:', err);
@@ -404,12 +862,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    initPreJoin();
+    checkMeetingStatus();
 
     let isHandRaised = false;
 
     // Socket Events
-    socket.emit('join-room', roomName, userSession);
+    // socket.emit('join-room', roomName, userSession); // This will be emitted inside joinRoom now to ensure it happens AFTER LiveKit connect if needed, or keep it here.
+    // Actually, join-room handles the "Lobby" sync too, so keep it.
+    // socket.emit('join-room', roomName, userSession);
+
 
     socket.on('hand-raised-updated', ({ userId, isHandRaised }) => {
         updateHandUI(userId, isHandRaised);
@@ -469,6 +930,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (createPollBtn) {
             createPollBtn.style.display = userSession.userId === hostId ? 'block' : 'none';
         }
+        
+        // Show/Hide Host Controls Tab
+        if (hostControlsTabBtn) {
+            hostControlsTabBtn.style.display = userSession.userId === hostId ? 'block' : 'none';
+        }
 
         // Update labels
         const localLabel = document.getElementById(`label-${userSession.userId}`);
@@ -476,40 +942,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         participantsList.innerHTML = '';
 
-        // Host Control: Allow Screen Share Toggle
+        // Sync Host Controls panel toggles
         if (userSession.userId === hostId) {
-            const toggleDiv = document.createElement('div');
-            toggleDiv.style.padding = '0.5rem';
-            toggleDiv.style.borderBottom = '1px solid var(--border-color)';
-            toggleDiv.style.display = 'flex';
-            toggleDiv.style.justifyContent = 'space-between';
-            toggleDiv.style.alignItems = 'center';
-            toggleDiv.innerHTML = `
-                <span style="font-size: 0.8rem;">Allow Screen Share for All</span>
-                <input type="checkbox" id="screenSharePermToggle" ${isScreenShareAllowed ? 'checked' : ''}>
-            `;
-            participantsList.appendChild(toggleDiv);
-
-            toggleDiv.querySelector('#screenSharePermToggle').onchange = (e) => {
-                socket.emit('toggle-screen-share-permission', e.target.checked);
-            };
-
-            // Whiteboard Permission Toggle
-            const wbToggleDiv = document.createElement('div');
-            wbToggleDiv.style.padding = '0.5rem';
-            wbToggleDiv.style.borderBottom = '1px solid var(--border-color)';
-            wbToggleDiv.style.display = 'flex';
-            wbToggleDiv.style.justifyContent = 'space-between';
-            wbToggleDiv.style.alignItems = 'center';
-            wbToggleDiv.innerHTML = `
-                <span style="font-size: 0.8rem;">Allow Whiteboard for All</span>
-                <input type="checkbox" id="wbPermToggle" ${isWhiteboardAllowedForAll ? 'checked' : ''}>
-            `;
-            participantsList.appendChild(wbToggleDiv);
-
-            wbToggleDiv.querySelector('#wbPermToggle').onchange = (e) => {
-                socket.emit('toggle-whiteboard-permission', e.target.checked);
-            };
+            const shareToggle = document.getElementById('allowScreenShareAll');
+            const wbToggle = document.getElementById('allowWhiteboardAll');
+            if (shareToggle) shareToggle.checked = isScreenShareAllowed;
+            if (wbToggle) wbToggle.checked = isWhiteboardAllowedForAll;
         }
 
         info.participants.forEach(p => {
@@ -868,6 +1306,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 muteIndicator.remove();
             }
         }
+
+        // Sidebar list sync
+        const listMic = document.getElementById(`list-mic-${userId}`);
+        if (listMic) {
+            listMic.innerHTML = isMuted ? ICONS.micOff : ICONS.mic;
+            listMic.classList.toggle('off', isMuted);
+        }
     }
 
     function updateHandUI(userId, isHandRaised) {
@@ -891,35 +1336,110 @@ document.addEventListener('DOMContentLoaded', () => {
         el.innerHTML = `<span>${name}</span>${isHost ? '<span class="host-badge">Host</span>' : ''}`;
     }
 
+    // Sub-tab switching logic for Participants
+    const subTabBtns = document.querySelectorAll('.sub-tab-btn');
+    const subTabContents = document.querySelectorAll('.sub-tab-content');
+
+    subTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-sub-target');
+            
+            // Update buttons
+            subTabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Update contents
+            subTabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === targetId) {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+
     function addParticipantToList(user) {
         if (document.getElementById(`user-list-${user.userId}`)) return;
-        const li = document.createElement('li');
-        li.id = `user-list-${user.userId}`;
-        li.style.display = 'flex';
-        li.style.justifyContent = 'space-between';
-        li.style.alignItems = 'center';
-        li.style.padding = '0.5rem';
-        li.style.listStyle = 'none';
-        li.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        const div = document.createElement('div');
+        div.id = `user-list-${user.userId}`;
+        div.className = 'participant-item';
+        
+        const isTargetHost = user.userId === hostId;
 
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = user.name + (user.userId === hostId ? ' (Host)' : '');
-        li.appendChild(nameSpan);
+        // Icons
+        const micIcon = document.createElement('div');
+        micIcon.id = `list-mic-${user.userId}`;
+        micIcon.className = 'participant-action-icon';
+        micIcon.innerHTML = ICONS.mic;
 
-        // Host Control: Remote Mute
-        if (userSession.userId === hostId && user.userId !== hostId) {
-            const muteBtn = document.createElement('button');
-            muteBtn.className = 'btn-secondary';
-            muteBtn.style.padding = '2px 8px';
-            muteBtn.style.fontSize = '0.7rem';
-            muteBtn.textContent = 'Mute';
-            muteBtn.onclick = () => {
-                socket.emit('remote-mute', user.userId);
-            };
-            li.appendChild(muteBtn);
+        const videoIcon = document.createElement('div');
+        videoIcon.id = `list-video-${user.userId}`;
+        videoIcon.className = 'participant-action-icon';
+        videoIcon.innerHTML = ICONS.video;
+
+        div.innerHTML = `
+            <div class="participant-info">
+                <div class="participant-avatar" id="list-avatar-wrapper-${user.userId}">
+                    <!-- Avatar will be inserted here -->
+                </div>
+                <span class="participant-name">
+                    ${user.name}${user.userId === userSession.userId ? ' (You)' : ''}${isTargetHost ? ' (Host)' : ''}
+                </span>
+            </div>
+            <div class="participant-actions">
+                <div id="list-hand-${user.userId}" class="participant-action-icon" style="display: none; color: var(--accent-color);">
+                    ${ICONS.hand}
+                </div>
+                <div id="list-mic-container-${user.userId}"></div>
+                <div id="list-video-container-${user.userId}"></div>
+            </div>
+        `;
+
+        document.getElementById('participantsList').appendChild(div);
+        
+        // Append avatar
+        const avatar = createAvatarElement(user);
+        document.getElementById(`list-avatar-wrapper-${user.userId}`).appendChild(avatar);
+        
+        // Append icons
+        document.getElementById(`list-mic-container-${user.userId}`).appendChild(micIcon);
+        document.getElementById(`list-video-container-${user.userId}`).appendChild(videoIcon);
+    }
+
+    function updateNetworkIndicator(userId, quality) {
+        const netEl = document.getElementById(`net-${userId}`);
+        if (!netEl) return;
+        
+        const bars = netEl.querySelectorAll('.network-bar');
+        bars.forEach(b => {
+            b.classList.remove('active', 'warning', 'danger');
+        });
+
+        let activeCount = 0;
+        let colorClass = '';
+        let tooltip = '';
+
+        if (quality === LivekitClient.ConnectionQuality.Excellent) {
+            activeCount = 4;
+            tooltip = 'Excellent connection';
+        } else if (quality === LivekitClient.ConnectionQuality.Good) {
+            activeCount = 3;
+            tooltip = 'Good connection';
+        } else if (quality === LivekitClient.ConnectionQuality.Poor) {
+            activeCount = 2;
+            colorClass = 'warning';
+            tooltip = 'Weak connection';
+        } else if (quality === LivekitClient.ConnectionQuality.Lost) {
+            activeCount = 1;
+            colorClass = 'danger';
+            tooltip = 'Poor connection';
         }
 
-        participantsList.appendChild(li);
+        for (let i = 0; i < activeCount; i++) {
+            bars[i].classList.add('active');
+            if (colorClass) bars[i].classList.add(colorClass);
+        }
+        netEl.title = tooltip;
     }
 
     function addSystemMessage(text) {
@@ -929,4 +1449,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
+
+    checkMeetingStatus();
 });

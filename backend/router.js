@@ -48,6 +48,10 @@ const router = (req, res) => {
         const meetingController = require('./controllers/meetingController');
         meetingController.validateMeeting(req, res);
     }
+    else if (req.method === 'POST' && pathname === '/api/meeting/toggle-lock') {
+        const meetingController = require('./controllers/meetingController');
+        meetingController.toggleLock(req, res);
+    }
     else if (req.method === 'POST' && pathname === '/api/livekit/token') {
         const livekitController = require('./controllers/livekitController');
         livekitController.generateToken(req, res);

@@ -136,6 +136,40 @@ module.exports = (io) => {
                 io.to(roomId).emit('remote-mute-request', { targetUserId });
             });
 
+            socket.on('mute-all', () => {
+                if (rooms[roomId].hostId !== user.userId) return;
+                socket.to(roomId).emit('remote-mute-request', { all: true });
+            });
+
+            socket.on('toggle-lock', (isLocked) => {
+                if (rooms[roomId].hostId !== user.userId) return;
+                rooms[roomId].isLocked = isLocked;
+                io.to(roomId).emit('lock-status-updated', { isLocked });
+            });
+
+            socket.on('request-to-join', (requestData) => {
+                // requestData should have { userId, name, picture }
+                // Find host
+                const host = rooms[roomId]?.participants.find(p => p.userId === rooms[roomId].hostId);
+                if (host && host.socketId) {
+                    io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
+                }
+            });
+
+            socket.on('join-response', ({ targetSocketId, allowed }) => {
+                if (rooms[roomId].hostId !== user.userId) return;
+                io.to(targetSocketId).emit('join-response', { allowed });
+            });
+
+            socket.on('kick-participant', (targetUserId) => {
+                if (rooms[roomId].hostId !== user.userId) return; // Host only
+                const target = rooms[roomId].participants.find(p => p.userId === targetUserId);
+                if (target && target.socketId) {
+                    io.to(target.socketId).emit('kicked');
+                    io.to(roomId).emit('user-kicked', { userId: targetUserId, name: target.name });
+                }
+            });
+
             socket.on('vote-poll', (pIndex, oIndex) => {
                 const room = rooms[roomId];
                 if (room && room.polls[pIndex] && !room.polls[pIndex].votedIds.includes(user.userId)) {
