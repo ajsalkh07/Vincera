@@ -149,7 +149,7 @@ module.exports = (io) => {
 
             // Request to join logic moved outside join-room
             socket.on('join-response', ({ targetSocketId, allowed }) => {
-                if (rooms[roomId].hostId !== user.userId) return;
+                if (!rooms[roomId] || rooms[roomId].hostId !== user.userId) return;
                 io.to(targetSocketId).emit('join-response', { allowed });
             });
 
@@ -203,9 +203,12 @@ module.exports = (io) => {
 
         socket.on('request-to-join', (requestData) => {
             const { roomId } = requestData;
-            const host = rooms[roomId]?.participants.find(p => p.userId === rooms[roomId].hostId);
-            if (host && host.socketId) {
-                io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
+            const room = rooms[roomId];
+            if (room) {
+                const host = room.participants.find(p => p.userId === room.hostId);
+                if (host && host.socketId) {
+                    io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
+                }
             }
         });
     });
