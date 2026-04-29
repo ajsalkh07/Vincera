@@ -16,10 +16,25 @@ module.exports = (io) => {
                     isScreenShareAllowed: false, // Only host by default
                     isWhiteboardOpen: false,
                     isWhiteboardAllowedForAll: false,
-                    drawingHistory: []
+                    drawingHistory: [],
+                    isLocked: false,
+                    pendingRequests: []
                 };
             }
 
+            // Handle locked room join requests
+            if (rooms[roomId].isLocked && user.userId !== rooms[roomId].hostId) {
+                // Add to pending requests
+                rooms[roomId].pendingRequests.push({ userId: user.userId, name: user.name, socketId: socket.id });
+                // Notify host of join request
+                const host = rooms[roomId].participants.find(p => p.userId === rooms[roomId].hostId);
+                if (host && host.socketId) {
+                    io.to(host.socketId).emit('join-request', { userId: user.userId, name: user.name, socketId: socket.id, roomId });
+                }
+                // Do not add participant yet, exit handler
+                return;
+            }
+            // Existing participant handling
             user.socketId = socket.id;
             const existingParticipant = rooms[roomId].participants.find(p => p.userId === user.userId);
             if (!existingParticipant) {
@@ -147,9 +162,44 @@ module.exports = (io) => {
                 io.to(roomId).emit('lock-status-updated', { isLocked });
             });
 
-            // Request to join logic moved outside join-room
-            socket.on('join-response', ({ targetSocketId, allowed }) => {
-                if (!rooms[roomId] || rooms[roomId].hostId !== user.userId) return;
+            // Host responds to a join request
+            socket.on('join-response', ({ roomId, targetSocketId, allowed }) => {
+                const room = rooms[roomId];
+                if (!room) return;
+                // Find pending request by target socketId
+                const requestIndex = room.pendingRequests.findIndex(r => r.socketId === targetSocketId);
+                if (requestIndex === -1) return; // No pending request found
+                const request = room.pendingRequests[requestIndex];
+                if (allowed) {
+                    // Add participant to room
+                    room.participants.push({
+                        userId: request.userId,
+                        name: request.name,
+                        socketId: request.socketId
+                    });
+                    // Notify the newly added participant with room info
+                    io.to(request.socketId).emit('join-allowed', {
+                        roomId,
+                        user: { userId: request.userId, name: request.name, socketId: request.socketId },
+                        roomInfo: {
+                            hostId: room.hostId,
+                            participants: room.participants,
+                            polls: room.polls,
+                            isScreenShareAllowed: room.isScreenShareAllowed,
+                            isWhiteboardOpen: room.isWhiteboardOpen,
+                            isWhiteboardAllowedForAll: room.isWhiteboardAllowedForAll,
+                            drawingHistory: room.drawingHistory
+                        }
+                    });
+                }
+                // Remove the request from pending list
+                room.pendingRequests.splice(requestIndex, 1);
+                // Notify host of updated pending requests
+                const host = room.participants.find(p => p.userId === room.hostId);
+                if (host && host.socketId) {
+                    io.to(host.socketId).emit('pending-requests-updated', room.pendingRequests);
+                }
+                // Inform the target socket of the response (allowed or denied)
                 io.to(targetSocketId).emit('join-response', { allowed });
             });
 
@@ -204,11 +254,38 @@ module.exports = (io) => {
         socket.on('request-to-join', (requestData) => {
             const { roomId } = requestData;
             const room = rooms[roomId];
-            if (room) {
+            if (!room) return;
+            // If room is not locked, auto-allow the user
+            if (!room.isLocked) {
+                // Add participant directly
+                const { userId, name } = requestData;
+                const participant = { userId, name, socketId: socket.id };
+                room.participants.push(participant);
+                // Emit join-allowed to the participant (self)
+                socket.emit('join-allowed', {
+                    roomId,
+                    user: participant,
+                    roomInfo: {
+                        hostId: room.hostId,
+                        participants: room.participants,
+                        polls: room.polls,
+                        isScreenShareAllowed: room.isScreenShareAllowed,
+                        isWhiteboardOpen: room.isWhiteboardOpen,
+                        isWhiteboardAllowedForAll: room.isWhiteboardAllowedForAll,
+                        drawingHistory: room.drawingHistory
+                    }
+                });
+                // Notify host of updated participants list
                 const host = room.participants.find(p => p.userId === room.hostId);
                 if (host && host.socketId) {
-                    io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
+                    io.to(host.socketId).emit('user-connected', participant);
                 }
+                return;
+            }
+            // Otherwise, send join request to host
+            const host = room.participants.find(p => p.userId === room.hostId);
+            if (host && host.socketId) {
+                io.to(host.socketId).emit('join-request', { ...requestData, socketId: socket.id });
             }
         });
     });
